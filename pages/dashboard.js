@@ -109,6 +109,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             { id: 'overview',    icon: '◈',  label: 'Overview' },
             { id: 'pool',        icon: '🎱', label: 'Pool Tables' },
             { id: 'arcade',      icon: '🕹',  label: 'Gao Arcades' },
+            { id: 'brokengames', icon: '🎮', label: 'Broken Games' },
             { id: 'pinball',     icon: '🎰', label: 'Kelvin Pinball' },
             { id: 'courier',     icon: '🚚', label: 'Courier Issues' },
             { id: 'ops',         icon: '⚙️', label: 'Ops Issues' },
@@ -142,7 +143,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             <div id="overview-content" style={{ display: 'none' }} />
           </div>
 
-          {['pool','arcade','pinball','courier','ops','refunds'].map(id => (
+          {['pool','arcade','brokengames','pinball','courier','ops','refunds'].map(id => (
             <div key={id} id={`section-${id}`} className="section-view">
               <div id={`${id}-content`}>
                 <div className="empty-state">
@@ -562,7 +563,7 @@ table.ticket-table td:first-child{font-family:var(--font-data);font-size:.75rem;
 `
 
 const DASHBOARD_LOGIC = `
-const FIELD_NAMES={PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'};
+const FIELD_NAMES={PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'};
 const POOL_PRODUCT='CSLT Pool Tables';
 const REASON_SUPPLIER='Item Damaged::Supplier Issue';
 const REASON_COURIER_POOL='Item Damaged::Courier Fault';
@@ -675,9 +676,76 @@ async function runReport(){
   btn.disabled=false;
 }
 
+function renderBrokenGames(){
+  const{tickets,fieldMap,lookbackDays}=state;
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const aid=fieldMap[FIELD_NAMES.ARCADE_ISSUE.toLowerCase()];
+  const bgid=fieldMap[FIELD_NAMES.BROKEN_GAMES.toLowerCase()];
+  // All tickets where Arcade Issue = "Game Not Working"
+  const tix=tickets.filter(t=>getFieldById(t,aid).toLowerCase()==='game not working');
+  document.getElementById('badge-brokengames').textContent=tix.length;
+  // Group by game name for summary
+  const byGame=sortedEntries(groupBy(tix,t=>getFieldById(t,bgid)||'Not Specified'));
+  const summaryRows=byGame.map(([game,gtix])=>
+    '<tr><td style="font-weight:600">'+esc(game)+'</td><td>'+gtix.length+'</td></tr>'
+  ).join('');
+  // Ticket list — newest first
+  const ticketRows=[...tix].sort((a,b)=>new Date(b.created_datetime)-new Date(a.created_datetime)).map(t=>{
+    const game=getFieldById(t,bgid)||'Not Specified';
+    const product=getFieldById(t,pid);
+    const date=t.created_datetime?new Date(t.created_datetime).toLocaleDateString('en-AU'):'—';
+    const statusCls=t.status==='closed'?'tag-closed':t.status==='pending'?'tag-pending':'tag-open';
+    return'<tr>'+
+      '<td style="font-family:var(--font-data);font-size:.75rem;color:var(--blue)">'+esc(String(t.id))+'</td>'+
+      '<td>'+esc((t.customer?.name)||'Unknown')+'</td>'+
+      '<td>'+esc(product)+'</td>'+
+      '<td style="font-weight:600;color:var(--amber)">'+esc(game)+'</td>'+
+      '<td><span class="tag '+statusCls+'">'+esc(t.status)+'</span></td>'+
+      '<td style="color:var(--text-2)">'+date+'</td>'+
+    '</tr>';
+  }).join('');
+  const html=
+    '<div class="page-header"><div>'+
+      '<div class="page-title accent-amber">🎮 Broken Games</div>'+
+      '<div class="page-subtitle">Arcade tickets where Issue = Game Not Working — game breakdown</div>'+
+    '</div><div class="period-badge">Last '+lookbackDays+' days</div></div>'+
+    // Summary by game
+    '<div class="blocks-2col" style="margin-bottom:20px">'+
+      '<div class="section-block">'+
+        '<div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-amber"></span>Games by Report Count</div></div></div>'+
+        '<div class="section-block-body">'+
+          '<div class="data-table-wrap"><table class="data-table">'+
+            '<thead><tr><th>Game</th><th>Reports</th></tr></thead>'+
+            '<tbody>'+summaryRows+'</tbody>'+
+            '<tfoot><tr class="total-row"><td>Total</td><td>'+tix.length+'</td></tr></tfoot>'+
+          '</table></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="section-block">'+
+        '<div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-blue"></span>Quick Stats</div></div></div>'+
+        '<div class="section-block-body">'+inlineStats(tix,null,tickets.length)+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    // Full ticket list
+    '<div class="section-block">'+
+      '<div class="section-block-header"><div>'+
+        '<div class="section-block-title"><span class="color-dot dot-amber"></span>All Broken Game Tickets</div>'+
+        '<div class="section-block-subtitle">'+tix.length+' tickets · newest first</div>'+
+      '</div></div>'+
+      '<div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap">'+
+        '<table class="data-table ticket-table">'+
+          '<thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Game Not Working</th><th>Status</th><th>Date</th></tr></thead>'+
+          '<tbody>'+ticketRows+'</tbody>'+
+        '</table>'+
+      '</div></div></div>'+
+    '</div>';
+  document.getElementById('brokengames-content').innerHTML=html;
+}
+
 function updateBadges(){document.getElementById('badge-overview').textContent=state.tickets.length;}
 
-function renderAll(){renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';}
+function renderAll(){renderOverview();renderPool();renderArcade();renderBrokenGames();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';}
 
 function inlineStats(curr,prev,totalAll){
   const sc=statusCounts(curr);
