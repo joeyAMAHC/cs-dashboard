@@ -675,6 +675,8 @@ async function runReport(){
   btn.disabled=false;
 }
 
+function updateBadges(){document.getElementById('badge-overview').textContent=state.tickets.length;}
+
 function renderAll(){renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';}
 
 function inlineStats(curr,prev,totalAll){
