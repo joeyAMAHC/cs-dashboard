@@ -109,7 +109,6 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             { id: 'overview',    icon: '◈',  label: 'Overview' },
             { id: 'pool',        icon: '🎱', label: 'Pool Tables' },
             { id: 'arcade',      icon: '🕹',  label: 'Gao Arcades' },
-            { id: 'brokengames', icon: '🎮', label: 'Broken Games' },
             { id: 'pinball',     icon: '🎰', label: 'Kelvin Pinball' },
             { id: 'courier',     icon: '🚚', label: 'Courier Issues' },
             { id: 'ops',         icon: '⚙️', label: 'Ops Issues' },
@@ -143,7 +142,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             <div id="overview-content" style={{ display: 'none' }} />
           </div>
 
-          {['pool','arcade','brokengames','pinball','courier','ops','refunds'].map(id => (
+          {['pool','arcade','pinball','courier','ops','refunds'].map(id => (
             <div key={id} id={`section-${id}`} className="section-view">
               <div id={`${id}-content`}>
                 <div className="empty-state">
@@ -745,7 +744,7 @@ function renderBrokenGames(){
 
 function updateBadges(){document.getElementById('badge-overview').textContent=state.tickets.length;}
 
-function renderAll(){renderOverview();renderPool();renderArcade();renderBrokenGames();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';}
+function renderAll(){renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';}
 
 function inlineStats(curr,prev,totalAll){
   const sc=statusCounts(curr);
@@ -894,6 +893,22 @@ function renderArcade(){
   const byIA=sortedEntries(groupBy(allArcade,t=>getFieldById(t,aid)));
   const prevByIA=groupBy(allArcadePrev,t=>getFieldById(t,aid));
   html+='<div class="section-block" style="border-color:rgba(255,86,85,.3)"><div class="section-block-header" style="background:var(--red-soft)"><div><div class="section-block-title"><span class="color-dot dot-red"></span>All Arcade Machines — Combined <span style="font-size:.8rem;font-weight:400">'+allArcade.length+'</span> '+deltaChip(allArcade.length,allArcadePrev.length,true)+'</div></div></div><div class="section-block-body">'+inlineStats(allArcade,allArcadePrev,total)+breakdownTable(byIA,'Issue / Damage Type',label=>(prevByIA[label]||[]))+'</div></div>';
+  // ── Broken Games section ─────────────────────────────────
+  const bgid=fieldMap[FIELD_NAMES.BROKEN_GAMES.toLowerCase()];
+  const brokenTix=tickets.filter(t=>getFieldById(t,aid).toLowerCase()==='game not working');
+  const byGame=sortedEntries(groupBy(brokenTix,t=>getFieldById(t,bgid)||'Not Specified'));
+  const summaryRows=byGame.map(([game,gtix])=>'<tr><td style="font-weight:600">'+esc(game)+'</td><td>'+gtix.length+'</td></tr>').join('');
+  const ticketRows=[...brokenTix].sort((a,b)=>new Date(b.created_datetime)-new Date(a.created_datetime)).map(t=>{
+    const game=getFieldById(t,bgid)||'Not Specified';
+    const prod=getFieldById(t,pid);
+    const date=t.created_datetime?new Date(t.created_datetime).toLocaleDateString('en-AU'):'—';
+    const sc=t.status==='closed'?'tag-closed':t.status==='pending'?'tag-pending':'tag-open';
+    return'<tr><td style="font-family:var(--font-data);font-size:.75rem;color:var(--blue)">'+esc(String(t.id))+'</td><td>'+esc((t.customer?.name)||'Unknown')+'</td><td>'+esc(prod)+'</td><td style="font-weight:600;color:var(--amber)">'+esc(game)+'</td><td><span class="tag '+sc+'">'+esc(t.status)+'</span></td><td style="color:var(--text-2)">'+date+'</td></tr>';
+  }).join('');
+  html+='<div class="section-block" style="border-color:rgba(245,164,40,.3);margin-top:8px"><div class="section-block-header" style="background:var(--amber-soft)"><div><div class="section-block-title"><span class="color-dot dot-amber"></span>🎮 Broken Games <span style="font-size:.8rem;font-weight:400">'+brokenTix.length+'</span></div><div class="section-block-subtitle">Tickets where Issue = Game Not Working — game breakdown</div></div></div><div class="section-block-body">'+
+    '<div class="blocks-2col" style="margin-bottom:16px"><div class="section-block" style="margin-bottom:0"><div class="section-block-header"><div><div class="section-block-title" style="font-size:.88rem"><span class="color-dot dot-amber"></span>By Game</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Game</th><th>Reports</th></tr></thead><tbody>'+summaryRows+'</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+brokenTix.length+'</td></tr></tfoot></table></div></div></div>'+
+    '<div class="section-block" style="margin-bottom:0"><div class="section-block-header"><div><div class="section-block-title" style="font-size:.88rem"><span class="color-dot dot-blue"></span>Quick Stats</div></div></div><div class="section-block-body">'+inlineStats(brokenTix,null,total)+'</div></div></div>'+
+    '<div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Game Not Working</th><th>Status</th><th>Date</th></tr></thead><tbody>'+ticketRows+'</tbody></table></div></div></div>';
   document.getElementById('arcade-content').innerHTML=html;
 }
 
