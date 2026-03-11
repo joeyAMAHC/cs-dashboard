@@ -109,6 +109,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             { id: 'overview',    icon: '◈',  label: 'Overview' },
             { id: 'pool',        icon: '🎱', label: 'Pool Tables' },
             { id: 'arcade',      icon: '🕹',  label: 'Gao Arcades' },
+            { id: 'pinball',     icon: '🎰', label: 'Kelvin Pinball' },
             { id: 'courier',     icon: '🚚', label: 'Courier Issues' },
             { id: 'ops',         icon: '⚙️', label: 'Ops Issues' },
             { id: 'refunds',     icon: '💰', label: 'Refunds & Replacements' },
@@ -141,7 +142,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             <div id="overview-content" style={{ display: 'none' }} />
           </div>
 
-          {['pool','arcade','courier','ops','refunds'].map(id => (
+          {['pool','arcade','pinball','courier','ops','refunds'].map(id => (
             <div key={id} id={`section-${id}`} className="section-view">
               <div id={`${id}-content`}>
                 <div className="empty-state">
@@ -561,12 +562,14 @@ table.ticket-table td:first-child{font-family:var(--font-data);font-size:.75rem;
 `
 
 const DASHBOARD_LOGIC = `
-const FIELD_NAMES={PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'};
+const FIELD_NAMES={PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'};
 const POOL_PRODUCT='CSLT Pool Tables';
 const REASON_SUPPLIER='Item Damaged::Supplier Issue';
 const REASON_COURIER_POOL='Item Damaged::Courier Fault';
 const ARCADE_PRODUCTS=['Upright Arcade','Cocktail Pro','Cocktail MKII'];
 const ARCADE_REASON='Item Not Working';
+const KELVIN_PRODUCTS=['Pinball Machine','Gearshift Pro'];
+const KELVIN_REASONS=['Item Not Working','Item Damaged::Supplier Issue'];
 const COURIER_REASONS=['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault'];
 const OPS_REASONS=['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder'];
 const REFUND_VALUES=['Refund','Partial Refund'];
@@ -591,7 +594,7 @@ function deltaChip(curr,prev,goodWhenDown=true){
 let state={fieldMap:{},tickets:[],ticketsPrev:[],lookbackDays:30,hasData:false,prevLabel:''};
 
 function getFieldById(t,id){if(!id)return'Not Set';const f=t.custom_fields;if(!f||typeof f!=='object')return'Not Set';const e=f[String(id)];if(!e)return'Not Set';return e.value!=null?String(e.value):'Not Set';}
-function statusCounts(tickets){const c={open:0,closed:0,pending:0};tickets.forEach(t=>{const s=(t.status||'').toLowerCase();if(c[s]!==undefined)c[s]++;else c.open++;});return c;}
+function statusCounts(tickets){const c={open:0,closed:0,pending:0};tickets.forEach(t=>{const s=(t.status||'').toLowerCase();if(s==='open'||s==='new')c.open++;else if(s==='closed')c.closed++;else if(s==='pending')c.pending++;});return c;}
 function avgResHours(tickets){const cl=tickets.filter(t=>t.status==='closed'&&t.created_datetime&&t.closed_datetime);if(!cl.length)return null;const tot=cl.reduce((s,t)=>s+(new Date(t.closed_datetime)-new Date(t.created_datetime))/3600000,0);return(tot/cl.length).toFixed(1);}
 function groupBy(tickets,fn){return tickets.reduce((a,t)=>{const k=fn(t)||'Not Set';if(!a[k])a[k]=[];a[k].push(t);return a;},{});}
 function dedup(arr){const s=new Set();return arr.filter(t=>{if(s.has(t.id))return false;s.add(t.id);return true;});}
@@ -660,7 +663,7 @@ async function runReport(){
   btn.disabled=false;
 }
 
-function renderAll(){renderOverview();renderPool();renderArcade();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';const label='Last '+state.lookbackDays+' days';['pool','arcade','courier','ops','refunds'].forEach(s=>{const el=document.getElementById('pb-'+s);if(el)el.textContent=label;});}
+function renderAll(){renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';}
 
 function inlineStats(curr,prev,totalAll){
   const sc=statusCounts(curr);
@@ -923,7 +926,41 @@ function renderRefunds(){
   document.getElementById('refunds-content').innerHTML=html;
 }
 
-function updateBadges(){document.getElementById('badge-overview').textContent=state.tickets.length;}
+function renderPinball(){
+  const{tickets,ticketsPrev,fieldMap}=state;
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const pfid=fieldMap[FIELD_NAMES.PINBALL_ISSUE.toLowerCase()];
+  const total=tickets.length;
+  const dots=['dot-purple','dot-cyan'];
+  const sets=KELVIN_PRODUCTS.map((prod,i)=>({
+    product:prod,
+    tickets:tickets.filter(t=>getFieldById(t,pid).toLowerCase()===prod.toLowerCase()&&KELVIN_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase())),
+    prev:ticketsPrev.filter(t=>getFieldById(t,pid).toLowerCase()===prod.toLowerCase()&&KELVIN_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase())),
+    dot:dots[i]
+  }));
+  const allKelvin=dedup(sets.flatMap(s=>s.tickets));
+  const allKelvinPrev=dedup(sets.flatMap(s=>s.prev));
+  document.getElementById('badge-pinball').textContent=allKelvin.length;
+  let html='<div class="page-header"><div><div class="page-title accent-purple">🎰 Kelvin Pinball &amp; Drivers</div><div class="page-subtitle">Pinball Machine · Gearshift Pro — Item Not Working &amp; Supplier Issues</div></div><div class="period-badge" id="pb-pinball">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  sets.forEach(({product,tickets:tix,prev,dot})=>{
+    const byI=sortedEntries(groupBy(tix,t=>getFieldById(t,pfid)||getFieldById(t,rid)));
+    const prevByI=groupBy(prev,t=>getFieldById(t,pfid)||getFieldById(t,rid));
+    // Also show breakdown by contact reason within this product
+    const byR=sortedEntries(groupBy(tix,t=>getFieldById(t,rid)));
+    const prevByR=groupBy(prev,t=>getFieldById(t,rid));
+    html+='<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot '+dot+'"></span>'+esc(product)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true)+'</div><div class="section-block-subtitle">'+tix.length+' tickets · prev: '+prev.length+'</div></div></div>'+
+      '<div class="section-block-body">'+inlineStats(tix,prev,total)+
+      // Pinball Issue breakdown (primary)
+      (pfid?'<div style="margin-bottom:6px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">By Pinball Issue</div>'+breakdownTable(byI,'Pinball Issue',label=>(prevByI[label]||[])):'<div style="margin-bottom:6px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">By Contact Reason</div>'+breakdownTable(byR,'Contact Reason',label=>(prevByR[label]||[])))+
+      '</div></div>';
+  });
+  // Combined total block
+  const byIAll=sortedEntries(groupBy(allKelvin,t=>getFieldById(t,pfid)||getFieldById(t,rid)));
+  const prevByIAll=groupBy(allKelvinPrev,t=>getFieldById(t,pfid)||getFieldById(t,rid));
+  html+='<div class="section-block" style="border-color:rgba(167,139,250,.3)"><div class="section-block-header" style="background:var(--purple-soft)"><div><div class="section-block-title"><span class="color-dot dot-purple"></span>All Kelvin Products — Combined <span style="font-size:.8rem;font-weight:400">'+allKelvin.length+'</span> '+deltaChip(allKelvin.length,allKelvinPrev.length,true)+'</div><div class="section-block-subtitle">'+allKelvin.length+' total tickets · prev: '+allKelvinPrev.length+'</div></div></div><div class="section-block-body">'+inlineStats(allKelvin,allKelvinPrev,total)+breakdownTable(byIAll,'Pinball Issue / Reason',label=>(prevByIAll[label]||[]))+'</div></div>';
+  document.getElementById('pinball-content').innerHTML=html;
+}
 
 function showSection(name){document.querySelectorAll('.section-view').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));document.getElementById('section-'+name).classList.add('active');document.querySelector('.nav-item[data-section="'+name+'"]').classList.add('active');}
 
