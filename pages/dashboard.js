@@ -659,6 +659,18 @@ async function runReport(){
     barEl.style.width='100%';addLog('✓ Done!','done');
     document.getElementById('last-run-time').textContent='Updated '+new Date().toLocaleTimeString();
     setTimeout(()=>showLoading(false),500);
+    // ── Auto-refresh every 60 min ───────────────────────────
+    if(window.__refreshTimer)clearInterval(window.__refreshTimer);
+    if(window.__countdownTimer)clearInterval(window.__countdownTimer);
+    let nextRefresh=Date.now()+60*60*1000;
+    window.__refreshTimer=setInterval(()=>{nextRefresh=Date.now()+60*60*1000;runReport();},60*60*1000);
+    window.__countdownTimer=setInterval(()=>{
+      const ms=nextRefresh-Date.now();
+      if(ms<=0)return;
+      const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000);
+      const el=document.getElementById('last-run-time');
+      if(el)el.textContent='Updated '+new Date().toLocaleTimeString()+' · next refresh in '+m+'m '+String(s).padStart(2,'0')+'s';
+    },1000);
   }catch(e){showLoading(false);errBanner.textContent='Error: '+e.message;errBanner.classList.add('visible');console.error(e);}
   btn.disabled=false;
 }
