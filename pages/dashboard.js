@@ -622,7 +622,7 @@ function sectionBlock({title,subtitle,dot,headerBg,borderColor,bodyHtml,summaryI
       '<div class="summary-bar-item"><div class="summary-bar-val"'+(color?' style="color:'+color+'"':'')+'>'+(val||'—')+'</div><div class="summary-bar-lbl">'+label+'</div></div>'
     ).join('')+'</div>':'';
   return'<div class="section-block"'+(borderColor?' style="border-color:'+borderColor+'"':'')+'>'+ 
-    '<div class="section-block-header'+(collapseState[id]?' collapsed':'')+'" id="block-hdr-'+id+'" onclick="toggleBlock(\''+id+'\')"'+(headerBg?' style="background:'+headerBg+'"':'')+'>'+ 
+    '<div class="section-block-header'+(collapseState[id]?' collapsed':'')+'" id="block-hdr-'+id+'" data-block-id="'+id+'"'+(headerBg?' style="background:'+headerBg+'"':'')+'>'+ 
       '<div><div class="section-block-title">'+dotHtml+title+'</div>'+(subtitle?'<div class="section-block-subtitle">'+subtitle+'</div>':'')+'</div>'+
       '<span class="collapse-chevron'+(collapseState[id]?'':' open')+'" id="block-chev-'+id+'">▾</span>'+
     '</div>'+
@@ -732,7 +732,19 @@ async function runReport(){
 
 function updateBadges(){document.getElementById('badge-overview').textContent=state.tickets.length;}
 
-function renderAll(){renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();document.getElementById('welcome').style.display='none';document.getElementById('overview-content').style.display='block';}
+function renderAll(){
+  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();
+  document.getElementById('welcome').style.display='none';
+  document.getElementById('overview-content').style.display='block';
+  // Wire up collapsible block headers via event delegation (safe — no inline onclick needed)
+  if(!window.__blockDelegationSet){
+    window.__blockDelegationSet=true;
+    document.getElementById('main').addEventListener('click',function(e){
+      const hdr=e.target.closest('[data-block-id]');
+      if(hdr)toggleBlock(hdr.getAttribute('data-block-id'));
+    });
+  }
+}
 
 function inlineStats(curr,prev,totalAll){
   const sc=statusCounts(curr);
