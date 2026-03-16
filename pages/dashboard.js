@@ -72,13 +72,13 @@ export default function Dashboard() {
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
       </Head>
-      <DashboardApp user={user} onSignOut={handleSignOut} authFetch={authFetch} />
+      <DashboardApp user={user} onSignOut={handleSignOut} authFetch={authFetch} authPost={authPost} />
     </>
   )
 }
 
 // ── The full dashboard UI ────────────────────────────────────
-function DashboardApp({ user, onSignOut, authFetch }) {
+function DashboardApp({ user, onSignOut, authFetch, authPost }) {
   const [showSettings, setShowSettings] = useState(false)
   const [customSections, setCustomSections] = useState(() => {
     if (typeof window === 'undefined') return []
