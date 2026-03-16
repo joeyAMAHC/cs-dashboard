@@ -186,12 +186,11 @@ function DashboardApp({ user, onSignOut, authFetch }) {
           </div>
         </nav>
 
-        <div id="print-header">
-          <div className="ph-title">CS Dashboard — <span id="ph-section" /></div>
-          <div className="ph-meta"><span id="ph-date" /></div>
-        </div>
-
         <main id="main">
+          <div id="print-header">
+            <div className="ph-title">CS Dashboard — <span id="ph-section" /></div>
+            <div className="ph-meta"><span id="ph-date" /></div>
+          </div>
           <div id="section-overview" className="section-view active">
             <div id="welcome">
               <div className="welcome-logo">📊</div>
@@ -1571,7 +1570,7 @@ function renderCustomSections(){
 
 function renderAll(){
   loadConfig();
-  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();renderAIReport();
+  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();try{renderAIReport();}catch(e){console.warn('AI report render error:',e);}
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
   // Wire up collapsible block headers + agent filter chips via event delegation
