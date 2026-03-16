@@ -559,9 +559,21 @@ function BlockEditor({ block: init, gorgiasFields, ticketValues, iStyle, onSave,
         </div>
       )}
       {b.groupField && (
-        <div style={{ marginTop:8 }}>
-          <div style={lbl}>Breakdown Column Header</div>
-          <input value={b.groupLabel||''} onChange={e=>updB('groupLabel',e.target.value)} placeholder={b.groupField||'Value'} style={iStyle} />
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8 }}>
+          <div>
+            <div style={lbl}>Breakdown Column Header</div>
+            <input value={b.groupLabel||''} onChange={e=>updB('groupLabel',e.target.value)} placeholder={b.groupField||'Value'} style={iStyle} />
+          </div>
+          <div>
+            <div style={lbl}>Breakdown Depth</div>
+            <select value={b.groupDepth||'full'} onChange={e=>updB('groupDepth',e.target.value)} style={{...iStyle,cursor:'pointer'}}>
+              <option value="full">Full path (e.g. WISMO::Item Delayed::Ops fault)</option>
+              <option value="1">Level 1 only (e.g. WISMO)</option>
+              <option value="2">Level 2 only (e.g. WISMO::Item Delayed)</option>
+              <option value="3">Level 3 only (e.g. WISMO::Item Delayed::Ops fault)</option>
+              <option value="last">Last segment only (e.g. Ops fault)</option>
+            </select>
+          </div>
         </div>
       )}
       <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:14 }}>
@@ -1412,9 +1424,18 @@ function renderDynamicBlock(block,tickets,ticketsPrev,fieldMap){
     if(fid){tix=tickets.filter(t=>block.filterValues.some(v=>matchesValue(getFieldById(t,fid),v)));prev=ticketsPrev.filter(t=>block.filterValues.some(v=>matchesValue(getFieldById(t,fid),v)));}
   }
   const gfid=block.groupField?fieldMap[block.groupField.toLowerCase()]:null;
+  // Apply depth truncation to group-by keys
+  function groupKey(t){
+    const raw=getFieldById(t,gfid);
+    const d=block.groupDepth;
+    if(!d||d==='full')return raw;
+    const parts=raw.split('::');
+    if(d==='last')return parts[parts.length-1];
+    const n=parseInt(d);return parts.slice(0,n).join('::');
+  }
   const sc=statusCounts(tix);const avg=avgResHours(tix);
-  const byGroup=gfid?sortedEntries(groupBy(tix,t=>getFieldById(t,gfid))):[];
-  const prevByGroup=gfid?groupBy(prev,t=>getFieldById(t,gfid)):{};
+  const byGroup=gfid?sortedEntries(groupBy(tix,t=>groupKey(t))):[];
+  const prevByGroup=gfid?groupBy(prev,t=>groupKey(t)):{};
   const bodyHtml=(gfid&&byGroup.length)?breakdownTable(byGroup,esc(block.groupLabel||block.groupField||'Value'),label=>(prevByGroup[label]||[])):inlineStats(tix,prev,state.tickets.length);
   return sectionBlock({title:esc(block.title)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length,dot:block.dot||'dot-blue',summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],bodyHtml:bodyHtml});
 }
