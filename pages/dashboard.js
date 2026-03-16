@@ -63,12 +63,13 @@ function DashboardApp({ user, onSignOut, authFetch }) {
     window.__authFetch = authFetch
     const script = document.createElement('script')
     script.id = '__dashboard_logic'
-    script.text = DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;'
+    script.text = DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;'
     document.body.appendChild(script)
     return () => {
       delete window.__authFetch
       delete window.__runReport
       delete window.__showSection
+      delete window.toggleBlock
       const el = document.getElementById('__dashboard_logic')
       if (el) el.remove()
     }
