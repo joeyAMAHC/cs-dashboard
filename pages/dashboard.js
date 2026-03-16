@@ -674,13 +674,40 @@ function SectionForm({ section: init, gorgiasFields, productsAvail, ticketValues
   )
 }
 
-// ── List Editor (drag-to-reorder, click-to-add) ───────────────
+// ── List Editor (tree-aware, drag-to-reorder) ────────────────
 function LEditor({ values, available, onChange, iStyle, ph }) {
   const [newVal, setNewVal] = useState('')
   const [dragIdx, setDragIdx] = useState(null)
   const [dragOver, setDragOver] = useState(null)
+  const [path, setPath] = useState([])
 
+  const hasHierarchy = (available || []).some(v => v.includes('::'))
   const notActive = (available || []).filter(v => !values.includes(v))
+
+  // Build tree from :: separated values
+  function buildTree(vals) {
+    const tree = {}
+    vals.forEach(v => {
+      const parts = v.split('::')
+      let node = tree
+      parts.forEach(part => {
+        if (!node[part]) node[part] = { _allVals: [], _children: {} }
+        node[part]._allVals.push(v)
+        node = node[part]._children
+      })
+    })
+    return tree
+  }
+  const tree = hasHierarchy ? buildTree(available || []) : {}
+  function getAtPath(p) {
+    let node = tree
+    for (const seg of p) { node = (node[seg] && node[seg]._children) ? node[seg]._children : {} }
+    return node
+  }
+  const currentNode = getAtPath(path)
+  const treeItems = Object.keys(currentNode).sort()
+  const currentPrefix = path.join('::')
+  function fullKey(item) { return path.length > 0 ? path.join('::') + '::' + item : item }
 
   function add(v) { const t = v.trim(); if (t && !values.includes(t)) onChange([...values, t]) }
   function remove(v) { onChange(values.filter(x => x !== v)) }
@@ -693,21 +720,68 @@ function LEditor({ values, available, onChange, iStyle, ph }) {
     setDragIdx(null); setDragOver(null)
   }
 
-  const boxStyle = { background:'var(--bg-canvas)', border:'1px solid var(--border)', borderRadius:6, minHeight:80, padding:6, marginBottom:8 }
+  const boxStyle = { background:'var(--bg-canvas)', border:'1px solid var(--border)', borderRadius:6, minHeight:80, maxHeight:200, overflowY:'auto', padding:6, marginBottom:8 }
   const colHd = { fontSize:'.7rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'.05em', color:'var(--text-3)', marginBottom:6 }
 
   return (
     <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginTop:8 }}>
-      {/* Left: Available */}
+      {/* Left: Tree browser or flat list */}
       <div>
-        <div style={colHd}>Available from ticket data {!available.length && '(run report first)'}</div>
+        <div style={colHd}>{hasHierarchy ? 'Browse Values' : 'Available from ticket data'}{' '}{!(available||[]).length && '(run report first)'}</div>
+
+        {/* Breadcrumb for tree mode */}
+        {hasHierarchy && (
+          <div style={{ display:'flex', alignItems:'center', gap:4, marginBottom:6, flexWrap:'wrap', fontSize:'.74rem', minHeight:18 }}>
+            <span onClick={() => setPath([])} style={{ color: path.length ? 'var(--blue)' : 'var(--text-3)', cursor: path.length ? 'pointer' : 'default', fontWeight:600 }}>All</span>
+            {path.map((seg, i) => (
+              <React.Fragment key={i}>
+                <span style={{ color:'var(--text-3)' }}>›</span>
+                <span onClick={() => setPath(path.slice(0, i+1))}
+                  style={{ color: i === path.length-1 ? 'var(--text-1)' : 'var(--blue)', cursor: i < path.length-1 ? 'pointer' : 'default', maxWidth:90, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {seg}
+                </span>
+              </React.Fragment>
+            ))}
+          </div>
+        )}
+
         <div style={boxStyle}>
-          {!notActive.length && (
+          {/* Tree items */}
+          {hasHierarchy && !treeItems.length && (
             <div style={{ color:'var(--text-3)', fontSize:'.8rem', padding:'6px', fontStyle:'italic' }}>
-              {!available.length ? 'Run a report to populate this list' : 'All available values are already active'}
+              {!(available||[]).length ? 'Run a report to populate values' : 'No items at this level'}
             </div>
           )}
-          {notActive.map(v => (
+          {hasHierarchy && treeItems.map(item => {
+            const fk = fullKey(item)
+            const children = (currentNode[item] && currentNode[item]._children) ? currentNode[item]._children : {}
+            const hasChildren = Object.keys(children).length > 0
+            const count = currentNode[item]?._allVals?.length || 0
+            const isSelected = values.includes(fk)
+            return (
+              <div key={item} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'5px 8px', borderRadius:4, marginBottom:2, background:'var(--bg-elevated)', fontSize:'.83rem', opacity: isSelected ? 0.6 : 1 }}>
+                <span onClick={() => { if(hasChildren) setPath([...path, item]) }}
+                  style={{ color:'var(--text-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1, cursor: hasChildren ? 'pointer' : 'default' }}
+                  onMouseEnter={e => { if(hasChildren) e.currentTarget.style.color='var(--blue)' }}
+                  onMouseLeave={e => e.currentTarget.style.color='var(--text-1)'}>
+                  {hasChildren ? '▸ ' : '\u00a0\u00a0'}{item}
+                  <span style={{ color:'var(--text-3)', marginLeft:4, fontSize:'.7rem' }}>({count})</span>
+                </span>
+                <span onClick={() => { if(!isSelected) add(fk) }}
+                  style={{ color: isSelected ? 'var(--green)' : 'var(--blue)', fontSize:'.7rem', flexShrink:0, marginLeft:6, cursor: isSelected ? 'default' : 'pointer', fontWeight:600 }}>
+                  {isSelected ? '✓' : '+ add'}
+                </span>
+              </div>
+            )
+          })}
+
+          {/* Flat items (no hierarchy) */}
+          {!hasHierarchy && !notActive.length && (
+            <div style={{ color:'var(--text-3)', fontSize:'.8rem', padding:'6px', fontStyle:'italic' }}>
+              {!(available||[]).length ? 'Run a report to populate this list' : 'All available values are already active'}
+            </div>
+          )}
+          {!hasHierarchy && notActive.map(v => (
             <div key={v} onClick={() => add(v)}
               style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 8px', borderRadius:4, cursor:'pointer', marginBottom:2, background:'var(--bg-elevated)', fontSize:'.83rem' }}
               onMouseEnter={e => e.currentTarget.style.background='var(--bg-hover)'}
@@ -717,6 +791,15 @@ function LEditor({ values, available, onChange, iStyle, ph }) {
             </div>
           ))}
         </div>
+
+        {/* "Add all at this path" shortcut for tree mode */}
+        {hasHierarchy && currentPrefix && !values.includes(currentPrefix) && treeItems.length > 0 && (
+          <button onClick={() => add(currentPrefix)}
+            style={{ background:'var(--blue-soft)', border:'1px solid rgba(79,142,255,.3)', color:'var(--blue)', borderRadius:6, padding:'5px 12px', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:'.76rem', width:'100%', marginBottom:6 }}>
+            + Add all "{path[path.length-1]}" as prefix match
+          </button>
+        )}
+
         <div style={{ display:'flex', gap:6 }}>
           <input value={newVal} onChange={e => setNewVal(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { add(newVal); setNewVal('') } }}
@@ -725,6 +808,7 @@ function LEditor({ values, available, onChange, iStyle, ph }) {
             style={{ background:'var(--blue)', color:'#fff', border:'none', borderRadius:6, padding:'0 12px', cursor:'pointer', fontSize:'.84rem', flexShrink:0, fontFamily:'var(--font-body)' }}>Add</button>
         </div>
       </div>
+
       {/* Right: Active */}
       <div>
         <div style={colHd}>Active ({values.length}) — drag to reorder</div>
@@ -740,6 +824,7 @@ function LEditor({ values, available, onChange, iStyle, ph }) {
             </div>
           ))}
         </div>
+        {hasHierarchy && <div style={{ fontSize:'.7rem', color:'var(--text-3)', lineHeight:1.5, marginTop:2 }}>▸ prefix items match all sub-levels. e.g. "WISMO" matches "WISMO::Item Delayed::Ops fault"</div>}
       </div>
     </div>
   )
@@ -1233,6 +1318,8 @@ function fmtMoney(v){const n=parseFloat(String(v).replace(/[^0-9.]/g,''));return
 function sumMoney(tickets,fid){return tickets.reduce((s,t)=>{const v=fmtMoney(getFieldById(t,fid));return s+(v||0);},0);}
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function sortedEntries(obj){return Object.entries(obj).sort((a,b)=>b[1].length-a[1].length);}
+// Prefix-aware match: "WISMO" matches "WISMO::Item Delayed::Ops fault"
+function matchesValue(fieldVal,filterVal){const f=fieldVal.toLowerCase().trim();const v=filterVal.toLowerCase().trim();return f===v||f.startsWith(v+'::');}
 
 async function fetchCustomFields(){const j=await window.__authFetch('/api/custom-fields');const map={};(j.data||[]).forEach(f=>{if(f.label)map[f.label.toLowerCase()]=f.id;});return map;}
 
@@ -1314,7 +1401,7 @@ function renderDynamicBlock(block,tickets,ticketsPrev,fieldMap){
   let tix=tickets,prev=ticketsPrev;
   if(block.filterField&&block.filterValues&&block.filterValues.length){
     const fid=fieldMap[block.filterField.toLowerCase()];
-    if(fid){tix=tickets.filter(t=>block.filterValues.some(v=>getFieldById(t,fid).toLowerCase()===v.toLowerCase()));prev=ticketsPrev.filter(t=>block.filterValues.some(v=>getFieldById(t,fid).toLowerCase()===v.toLowerCase()));}
+    if(fid){tix=tickets.filter(t=>block.filterValues.some(v=>matchesValue(getFieldById(t,fid),v)));prev=ticketsPrev.filter(t=>block.filterValues.some(v=>matchesValue(getFieldById(t,fid),v)));}
   }
   const gfid=block.groupField?fieldMap[block.groupField.toLowerCase()]:null;
   const sc=statusCounts(tix);const avg=avgResHours(tix);
@@ -1423,14 +1510,14 @@ function renderOverview(){
   const pe=sortedEntries(byProduct).slice(0,12);
   const maxP=pe[0]?.[1].length||1;
   const byProductPrev=groupBy(prev,t=>getFieldById(t,fid));
-  const opsTotal=dedup(tickets.filter(t=>OPS_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase()))).length;
-  const opsPrev=dedup(prev.filter(t=>OPS_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase()))).length;
-  const courierTotal=dedup(tickets.filter(t=>COURIER_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase()))).length;
-  const courierPrev=dedup(prev.filter(t=>COURIER_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase()))).length;
-  const refundTotal=tickets.filter(t=>REFUND_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase())).length;
-  const refundPrev=prev.filter(t=>REFUND_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase())).length;
-  const replTix=tickets.filter(t=>REPLACEMENT_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase()));
-  const replPrev=prev.filter(t=>REPLACEMENT_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase()));
+  const opsTotal=dedup(tickets.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
+  const opsPrev=dedup(prev.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
+  const courierTotal=dedup(tickets.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
+  const courierPrev=dedup(prev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
+  const refundTotal=tickets.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v))).length;
+  const refundPrev=prev.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v))).length;
+  const replTix=tickets.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const replPrev=prev.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   function statCardComp(label,curr,p,color,cls,goodWhenDown=true){
     return'<div class="stat-card '+cls+'"><div class="stat-label">'+label+'</div><div class="stat-value '+color+'">'+curr+'</div><div class="stat-sub" style="display:flex;align-items:center;gap:6px"><span style="color:var(--text-3)">prev: '+p+'</span>'+deltaChip(curr,p,goodWhenDown)+'</div></div>';
   }
@@ -1461,12 +1548,12 @@ function renderPool(){
   const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
   const did=fieldMap[FIELD_NAMES.DAMAGE.toLowerCase()];
-  const poolT=tickets.filter(t=>getFieldById(t,pid).toLowerCase()===POOL_PRODUCT.toLowerCase());
-  const poolPrev=ticketsPrev.filter(t=>getFieldById(t,pid).toLowerCase()===POOL_PRODUCT.toLowerCase());
-  const supT=poolT.filter(t=>getFieldById(t,rid).toLowerCase()===REASON_SUPPLIER.toLowerCase());
-  const supPrev=poolPrev.filter(t=>getFieldById(t,rid).toLowerCase()===REASON_SUPPLIER.toLowerCase());
-  const courT=poolT.filter(t=>getFieldById(t,rid).toLowerCase()===REASON_COURIER_POOL.toLowerCase());
-  const courPrev=poolPrev.filter(t=>getFieldById(t,rid).toLowerCase()===REASON_COURIER_POOL.toLowerCase());
+  const poolT=tickets.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
+  const poolPrev=ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
+  const supT=poolT.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  const supPrev=poolPrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  const courT=poolT.filter(t=>matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
+  const courPrev=poolPrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
   const allD=dedup([...supT,...courT]);
   const allDPrev=dedup([...supPrev,...courPrev]);
   const total=tickets.length;
@@ -1511,8 +1598,8 @@ function renderArcade(){
   const dots=['dot-blue','dot-green','dot-amber'];
   const sets=ARCADE_PRODUCTS.map((prod,i)=>({
     product:prod,
-    tickets:tickets.filter(t=>getFieldById(t,pid).toLowerCase()===prod.toLowerCase()&&getFieldById(t,rid).toLowerCase()===ARCADE_REASON.toLowerCase()),
-    prev:ticketsPrev.filter(t=>getFieldById(t,pid).toLowerCase()===prod.toLowerCase()&&getFieldById(t,rid).toLowerCase()===ARCADE_REASON.toLowerCase()),
+    tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&matchesValue(getFieldById(t,rid),ARCADE_REASON)),
+    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&matchesValue(getFieldById(t,rid),ARCADE_REASON)),
     color:colors[i],dot:dots[i]
   }));
   const allArcade=dedup(sets.flatMap(s=>s.tickets));
@@ -1560,13 +1647,13 @@ function renderCourier(){
   const cid=fieldMap[FIELD_NAMES.COURIER.toLowerCase()];
   const total=tickets.length;
   const dots=['dot-red','dot-amber','dot-blue','dot-purple'];
-  const allC=dedup(tickets.filter(t=>COURIER_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase())));
-  const allCPrev=dedup(ticketsPrev.filter(t=>COURIER_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase())));
+  const allC=dedup(tickets.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))));
+  const allCPrev=dedup(ticketsPrev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))));
   document.getElementById('badge-courier').textContent=allC.length;
   let html='<div class="page-header"><div><div class="page-title accent-amber">🚚 Courier Issues</div><div class="page-subtitle">Missing · Delayed · Wrong Address · Damaged — by courier</div></div><div class="period-badge" id="pb-courier">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   COURIER_REASONS.forEach((reason,i)=>{
-    const tix=tickets.filter(t=>getFieldById(t,rid).toLowerCase()===reason.toLowerCase());
-    const prev=ticketsPrev.filter(t=>getFieldById(t,rid).toLowerCase()===reason.toLowerCase());
+    const tix=tickets.filter(t=>matchesValue(getFieldById(t,rid),reason));
+    const prev=ticketsPrev.filter(t=>matchesValue(getFieldById(t,rid),reason));
     const sc=statusCounts(tix);const avg=avgResHours(tix);
     const byC=sortedEntries(groupBy(tix,t=>getFieldById(t,cid)));
     const prevByC=groupBy(prev,t=>getFieldById(t,cid));
@@ -1592,8 +1679,8 @@ function renderOps(){
   const total=tickets.length;
   const opsGroups=OPS_REASONS.map(reason=>({
     reason,
-    tickets:tickets.filter(t=>getFieldById(t,rid).toLowerCase()===reason.toLowerCase()),
-    prev:ticketsPrev.filter(t=>getFieldById(t,rid).toLowerCase()===reason.toLowerCase())
+    tickets:tickets.filter(t=>matchesValue(getFieldById(t,rid),reason)),
+    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,rid),reason))
   }));
   const opsTotal=dedup(opsGroups.flatMap(g=>g.tickets)).length;
   const opsPrevTotal=dedup(opsGroups.flatMap(g=>g.prev)).length;
@@ -1629,8 +1716,8 @@ function renderRefunds(){
   const onfid=fieldMap[FIELD_NAMES.ORDER_NUMBER.toLowerCase()];
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
   const total=tickets.length;
-  const refundTix=tickets.filter(t=>REFUND_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase()));
-  const refundPrev=ticketsPrev.filter(t=>REFUND_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase()));
+  const refundTix=tickets.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const refundPrev=ticketsPrev.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   const fullR=refundTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='refund');
   const fullRPrev=refundPrev.filter(t=>getFieldById(t,resfid).toLowerCase()==='refund');
   const partR=refundTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='partial refund');
@@ -1639,8 +1726,8 @@ function renderRefunds(){
   const totalValPrev=sumMoney(refundPrev,rvfid);
   const fullVal=sumMoney(fullR,rvfid);
   const partVal=sumMoney(partR,rvfid);
-  const replTix=tickets.filter(t=>REPLACEMENT_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase()));
-  const replPrev=ticketsPrev.filter(t=>REPLACEMENT_VALUES.map(v=>v.toLowerCase()).includes(getFieldById(t,resfid).toLowerCase()));
+  const replTix=tickets.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const replPrev=ticketsPrev.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   const freeU=replTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='free product upgrade');
   const freeG=replTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='free gift');
   const replS=replTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='replacement sent');
@@ -1688,8 +1775,8 @@ function renderPinball(){
   const dots=['dot-purple','dot-cyan'];
   const sets=KELVIN_PRODUCTS.map((prod,i)=>({
     product:prod,
-    tickets:tickets.filter(t=>getFieldById(t,pid).toLowerCase()===prod.toLowerCase()&&KELVIN_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase())),
-    prev:ticketsPrev.filter(t=>getFieldById(t,pid).toLowerCase()===prod.toLowerCase()&&KELVIN_REASONS.some(r=>getFieldById(t,rid).toLowerCase()===r.toLowerCase())),
+    tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))),
+    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))),
     dot:dots[i]
   }));
   const allKelvin=dedup(sets.flatMap(s=>s.tickets));
