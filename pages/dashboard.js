@@ -26,15 +26,27 @@ export default function Dashboard() {
   }
 
   // Authenticated fetch — attaches the Supabase token to every API call
-  async function authFetch(url, options = {}) {
+  async function authFetch(url) {
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
     const res = await fetch(url, {
-      ...options,
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    return res.json()
+  }
+
+  // Authenticated POST — used by AI report
+  async function authPost(url, body) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    const res = await fetch(url, {
+      method: 'POST',
       headers: {
-        ...(options.headers || {}),
+        'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
-      }
+      },
+      body: JSON.stringify(body)
     })
     if (!res.ok) {
       let msg = `HTTP ${res.status}`
@@ -82,6 +94,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
     } catch(e) {}
 
     window.__authFetch = authFetch
+    window.__authPost = authPost
     // Remove any existing script first
     const existing = document.getElementById('__dashboard_logic')
     if (existing) existing.remove()
@@ -91,6 +104,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
     document.body.appendChild(script)
     return () => {
       delete window.__authFetch
+      delete window.__authPost
       delete window.__runReport
       delete window.__showSection
       delete window.toggleBlock
@@ -2068,7 +2082,7 @@ async function generateAIReport(){
     '<div class="ai-thinking"><div class="spin"></div> Analysing '+s.tickets.length+' tickets — this takes about 10 seconds…</div></div></div>';
   try{
     const summary=buildTicketSummary();
-    const result=await window.__authFetch('/api/ai-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({summary})});
+    const result=await window.__authPost('/api/ai-report',{summary});
     window.__aiReportCache={report:result.report,generatedAt:result.generatedAt};
     renderAIReport();
   }catch(err){
