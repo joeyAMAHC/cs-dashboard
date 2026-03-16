@@ -79,7 +79,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
     if (existing) existing.remove()
     const script = document.createElement('script')
     script.id = '__dashboard_logic'
-    script.appendChild(document.createTextNode(DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;\nwindow.__renderAll = renderAll;'))
+    script.appendChild(document.createTextNode(DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;\nwindow.__renderAll = renderAll;\nwindow.__toggleAgent = toggleAgent;'))
     document.body.appendChild(script)
     return () => {
       delete window.__authFetch
@@ -1307,6 +1307,14 @@ function deltaChip(curr,prev,goodWhenDown=true){
 }
 
 let state={fieldMap:{},tickets:[],ticketsPrev:[],lookbackDays:30,hasData:false,prevLabel:''};
+let agentFilter=[];// [] = all agents shown
+function toggleAgent(name){
+  if(name==='__all'){agentFilter=[];}
+  else if(agentFilter.includes(name)){agentFilter=agentFilter.filter(a=>a!==name);}
+  else{agentFilter=[...agentFilter,name];}
+  renderOverview();
+}
+function getAgentName(t){return(t.assignee_user&&t.assignee_user.name)||'Unassigned';}
 
 function getFieldById(t,id){if(!id)return'Not Set';const f=t.custom_fields;if(!f||typeof f!=='object')return'Not Set';const e=f[String(id)];if(!e)return'Not Set';return e.value!=null?String(e.value):'Not Set';}
 function statusCounts(tickets){const c={open:0,closed:0,pending:0};tickets.forEach(t=>{const s=(t.status||'').toLowerCase();if(s==='open'||s==='new')c.open++;else if(s==='closed')c.closed++;else if(s==='pending')c.pending++;});return c;}
@@ -1441,12 +1449,14 @@ function renderAll(){
   renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
-  // Wire up collapsible block headers via event delegation (safe — no inline onclick needed)
+  // Wire up collapsible block headers + agent filter chips via event delegation
   if(!window.__blockDelegationSet){
     window.__blockDelegationSet=true;
     document.getElementById('main').addEventListener('click',function(e){
       const hdr=e.target.closest('[data-block-id]');
-      if(hdr)toggleBlock(hdr.getAttribute('data-block-id'));
+      if(hdr){toggleBlock(hdr.getAttribute('data-block-id'));return;}
+      const agentChip=e.target.closest('[data-agent]');
+      if(agentChip){toggleAgent(agentChip.getAttribute('data-agent'));return;}
     });
   }
 }
@@ -1500,37 +1510,60 @@ function breakdownTable(currRows,col1,prevTicketsFn){
 
 function renderOverview(){
   const{tickets,ticketsPrev,fieldMap,lookbackDays}=state;
-  const prev=ticketsPrev;
-  const total=tickets.length;const ptotal=prev.length;
-  const sc=statusCounts(tickets);const psc=statusCounts(prev);
+
+  // ── Agent filter ─────────────────────────────────────────────
+  const allAgents=[...new Set(tickets.map(t=>getAgentName(t)))].sort();
+  const tix=agentFilter.length>0?tickets.filter(t=>agentFilter.includes(getAgentName(t))):tickets;
+  const prev=agentFilter.length>0?ticketsPrev.filter(t=>agentFilter.includes(getAgentName(t))):ticketsPrev;
+
+  // Agent filter bar HTML
+  const chipStyle=(active)=>'display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:20px;font-size:.8rem;font-weight:'+(active?'600':'400')+';cursor:pointer;border:1px solid '+(active?'rgba(79,142,255,.4)':'var(--border)')+';background:'+(active?'var(--blue-soft)':'transparent')+';color:'+(active?'var(--blue)':'var(--text-3)')+';transition:all .15s;white-space:nowrap';
+  const allActive=agentFilter.length===0;
+  let agentBar='';
+  if(allAgents.length>1){
+    agentBar='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:20px;padding:12px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">'+
+      '<span style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);margin-right:2px;flex-shrink:0">Agent</span>'+
+      '<span data-agent="__all" style="'+chipStyle(allActive)+'">All <span style="font-family:var(--font-data);font-size:.72rem;opacity:.7">('+tickets.length+')</span></span>'+
+      allAgents.map(a=>{
+        const cnt=tickets.filter(t=>getAgentName(t)===a).length;
+        const active=agentFilter.includes(a);
+        return'<span data-agent="'+esc(a)+'" style="'+chipStyle(active)+'">'+esc(a)+' <span style="font-family:var(--font-data);font-size:.72rem;opacity:.7">('+cnt+')</span></span>';
+      }).join('')+
+    '</div>';
+  }
+
+  const total=tix.length;const ptotal=prev.length;
+  const sc=statusCounts(tix);const psc=statusCounts(prev);
   const fid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
   const resfid=fieldMap[FIELD_NAMES.RESOLUTION.toLowerCase()];
-  const byProduct=groupBy(tickets,t=>getFieldById(t,fid));
+  const byProduct=groupBy(tix,t=>getFieldById(t,fid));
   const pe=sortedEntries(byProduct).slice(0,12);
   const maxP=pe[0]?.[1].length||1;
   const byProductPrev=groupBy(prev,t=>getFieldById(t,fid));
-  const opsTotal=dedup(tickets.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
+  const opsTotal=dedup(tix.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
   const opsPrev=dedup(prev.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
-  const courierTotal=dedup(tickets.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
+  const courierTotal=dedup(tix.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
   const courierPrev=dedup(prev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)))).length;
-  const refundTotal=tickets.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v))).length;
+  const refundTotal=tix.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v))).length;
   const refundPrev=prev.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v))).length;
-  const replTix=tickets.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const replTix=tix.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   const replPrev=prev.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   function statCardComp(label,curr,p,color,cls,goodWhenDown=true){
     return'<div class="stat-card '+cls+'"><div class="stat-label">'+label+'</div><div class="stat-value '+color+'">'+curr+'</div><div class="stat-sub" style="display:flex;align-items:center;gap:6px"><span style="color:var(--text-3)">prev: '+p+'</span>'+deltaChip(curr,p,goodWhenDown)+'</div></div>';
   }
-  const prodBars=pe.map(([name,tix])=>{
+  const prodBars=pe.map(([name,ptix])=>{
     const pCount=(byProductPrev[name]||[]).length;
-    const chip=deltaChip(tix.length,pCount,true);
-    return'<div class="bar-row"><div class="bar-row-label" title="'+esc(name)+'">'+esc(name)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(tix.length/maxP*100).toFixed(1)+'%;background:var(--blue)"></div></div><div class="bar-row-val">'+tix.length+' '+chip+'</div></div>';
+    const chip=deltaChip(ptix.length,pCount,true);
+    return'<div class="bar-row"><div class="bar-row-label" title="'+esc(name)+'">'+esc(name)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(ptix.length/maxP*100).toFixed(1)+'%;background:var(--blue)"></div></div><div class="bar-row-val">'+ptix.length+' '+chip+'</div></div>';
   }).join('');
   const catRows=[['Ops Issues',opsTotal,opsPrev,'var(--red)',true],['Courier Issues',courierTotal,courierPrev,'var(--amber)',true],['Refunds',refundTotal,refundPrev,'var(--purple)',true],['Replacements',replTix.length,replPrev.length,'var(--green)',true]];
   const maxCat=Math.max(...catRows.map(r=>r[1]),1);
   const catBars=catRows.map(([label,count,pCount,color])=>'<div class="bar-row"><div class="bar-row-label">'+esc(label)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(count/maxCat*100).toFixed(1)+'%;background:'+color+'"></div></div><div class="bar-row-val">'+count+' '+deltaChip(count,pCount,true)+'</div></div>').join('');
   const compBadge='<span style="font-size:.72rem;color:var(--text-3);margin-left:8px">vs '+state.prevLabel+'</span>';
-  const html='<div class="page-header"><div><div class="page-title">◈ Overview</div><div class="page-subtitle">Last '+lookbackDays+' days &nbsp;·&nbsp; '+total+' total tickets</div></div><div class="period-badge">Last '+lookbackDays+' days'+compBadge+'</div></div>'+
+  const agentLabel=agentFilter.length>0?' · '+agentFilter.join(', '):'';
+  const html=agentBar+
+    '<div class="page-header"><div><div class="page-title">◈ Overview</div><div class="page-subtitle">Last '+lookbackDays+' days &nbsp;·&nbsp; '+total+' tickets'+esc(agentLabel)+'</div></div><div class="period-badge">Last '+lookbackDays+' days'+compBadge+'</div></div>'+
     '<div class="stats-grid">'+
     statCardComp('Total Tickets',total,ptotal,'blue','blue',true)+
     statCardComp('Open',sc.open,psc.open,'amber','amber',true)+
