@@ -26,13 +26,21 @@ export default function Dashboard() {
   }
 
   // Authenticated fetch — attaches the Supabase token to every API call
-  async function authFetch(url) {
+  async function authFetch(url, options = {}) {
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
     const res = await fetch(url, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {}
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      }
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`
+      try { const j = await res.json(); msg = j.error || msg } catch(e) {}
+      throw new Error(msg)
+    }
     return res.json()
   }
 
@@ -79,7 +87,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
     if (existing) existing.remove()
     const script = document.createElement('script')
     script.id = '__dashboard_logic'
-    script.appendChild(document.createTextNode(DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;\nwindow.__renderAll = renderAll;\nwindow.__toggleAgent = toggleAgent;'))
+    script.appendChild(document.createTextNode(DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;\nwindow.__renderAll = renderAll;\nwindow.__toggleAgent = toggleAgent;\nwindow.__generateAIReport = generateAIReport;'))
     document.body.appendChild(script)
     return () => {
       delete window.__authFetch
@@ -87,6 +95,8 @@ function DashboardApp({ user, onSignOut, authFetch }) {
       delete window.__showSection
       delete window.toggleBlock
       delete window.__renderAll
+      delete window.__toggleAgent
+      delete window.__generateAIReport
       delete window.__state
       const el = document.getElementById('__dashboard_logic')
       if (el) el.remove()
@@ -115,6 +125,22 @@ function DashboardApp({ user, onSignOut, authFetch }) {
           <button className="btn btn-primary" id="run-btn" onClick={() => window.__runReport()}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Run Report
+          </button>
+          <button className="btn btn-ghost" title="Export current section as PDF" onClick={() => {
+            const active = document.querySelector('.section-view.active')
+            const titleEl = active?.querySelector('.page-title')
+            const sectionName = titleEl ? titleEl.textContent.replace(/[^\w\s&]/g,'').trim() : 'Dashboard'
+            const periodEl = active?.querySelector('.period-badge')
+            const period = periodEl ? periodEl.textContent.trim() : ''
+            const ph = document.getElementById('print-header')
+            if(ph){
+              document.getElementById('ph-section').textContent = sectionName
+              document.getElementById('ph-date').textContent = period + ' · Exported ' + new Date().toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'})
+            }
+            window.print()
+          }} style={{ padding: '6px 12px', fontSize: '.85rem', gap: 5 }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Export PDF
           </button>
           <button className="btn btn-ghost" onClick={() => setShowSettings(true)} style={{ padding: '6px 12px', fontSize: '1rem', lineHeight: 1 }} title="Dashboard Settings">⚙️</button>
           <div className="user-pill">
@@ -152,10 +178,18 @@ function DashboardApp({ user, onSignOut, authFetch }) {
           <div className="nav-item" data-section="comparison" onClick={() => window.__showSection('comparison')}>
             <span className="nav-icon">📅</span> MoM Comparison
           </div>
+          <div className="nav-item" data-section="ai-report" onClick={() => window.__showSection('ai-report')}>
+            <span className="nav-icon">🤖</span> AI Insights
+          </div>
           <div className="sidebar-footer">
             <div id="last-run-time" style={{ fontSize: '.72rem', color: 'var(--text-3)', padding: '0 10px' }} />
           </div>
         </nav>
+
+        <div id="print-header">
+          <div className="ph-title">CS Dashboard — <span id="ph-section" /></div>
+          <div className="ph-meta"><span id="ph-date" /></div>
+        </div>
 
         <main id="main">
           <div id="section-overview" className="section-view active">
@@ -191,6 +225,12 @@ function DashboardApp({ user, onSignOut, authFetch }) {
 
           <div id="section-comparison" className="section-view">
             <ComparisonSection authFetch={authFetch} />
+          </div>
+
+          <div id="section-ai-report" className="section-view">
+            <div id="ai-report-content">
+              <div className="empty-state"><div className="empty-state-msg">Run the report first, then generate AI insights</div></div>
+            </div>
           </div>
         </main>
       </div>
@@ -1267,6 +1307,49 @@ table.ticket-table{font-size:.8rem}
 table.ticket-table td:first-child{font-family:var(--font-data);font-size:.75rem;color:var(--blue)}
 .accent-blue{color:var(--blue)}.accent-green{color:var(--green)}.accent-amber{color:var(--amber)}.accent-red{color:var(--red)}.accent-purple{color:var(--purple)}
 .dot-blue{background:var(--blue)}.dot-green{background:var(--green)}.dot-amber{background:var(--amber)}.dot-red{background:var(--red)}.dot-purple{background:var(--purple)}.dot-cyan{background:var(--cyan)}
+/* AI Report */
+.ai-report-body{line-height:1.7;font-size:.9rem;color:var(--text-1)}
+.ai-report-body h2{font-family:var(--font-head);font-size:1.1rem;font-weight:800;color:var(--text-1);margin:20px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.ai-report-body h2:first-child{margin-top:0}
+.ai-report-body h3{font-size:.9rem;font-weight:700;color:var(--blue);margin:12px 0 4px}
+.ai-report-body ul{padding-left:20px;margin:6px 0}
+.ai-report-body li{margin-bottom:4px}
+.ai-report-body strong{color:var(--text-1)}
+.ai-report-body p{margin-bottom:10px}
+.ai-report-body .priority-pill{display:inline-block;background:var(--red-soft);color:var(--red);border-radius:4px;padding:1px 7px;font-size:.72rem;font-weight:700;margin-right:6px}
+.ai-generate-btn{display:inline-flex;align-items:center;gap:8px;padding:12px 22px;background:linear-gradient(135deg,#4f8eff,#a78bfa);color:#fff;border:none;border-radius:8px;font-family:var(--font-body);font-size:.95rem;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s}
+.ai-generate-btn:hover{opacity:.88}.ai-generate-btn:active{transform:scale(.97)}
+.ai-generate-btn:disabled{opacity:.45;cursor:not-allowed}
+.ai-thinking{display:flex;align-items:center;gap:10px;color:var(--text-2);font-size:.88rem;padding:20px 0}
+.ai-thinking .spin{border-top-color:var(--purple)}
+/* Print styles */
+@media print{
+  :root{--bg:#fff;--bg-canvas:#fff;--bg-card:#fff;--bg-elevated:#f4f4f4;--bg-hover:#eee;--border:#d0d0d0;--border-soft:#e4e4e4;--text-1:#111;--text-2:#444;--text-3:#777;--blue:#2563eb;--green:#15803d;--amber:#b45309;--red:#dc2626;--purple:#7c3aed;--cyan:#0891b2;--blue-soft:#dbeafe;--green-soft:#dcfce7;--amber-soft:#fef9c3;--red-soft:#fee2e2;--purple-soft:#ede9fe;--cyan-soft:#cffafe}
+  html,body{overflow:visible!important;height:auto!important;background:#fff!important}
+  #app{display:block!important;height:auto!important}
+  #topbar,#sidebar,#loading-overlay{display:none!important}
+  #main{overflow:visible!important;padding:16px 24px!important;background:#fff!important;grid-column:1!important}
+  .section-view{display:none!important}
+  .section-view.active{display:block!important}
+  .ticket-list-wrap{max-height:none!important;overflow:visible!important}
+  .data-table-wrap{overflow:visible!important}
+  .section-block{page-break-inside:avoid;box-shadow:none!important;border:1px solid #d0d0d0!important}
+  .section-block-body.collapsed{display:block!important}
+  .section-block-header{background:#f8f8f8!important;border-bottom:1px solid #d0d0d0!important}
+  .stats-grid{page-break-inside:avoid}
+  .blocks-2col{page-break-inside:avoid}
+  .stat-card{border:1px solid #d0d0d0!important;background:#fff!important;box-shadow:none!important;page-break-inside:avoid}
+  table.data-table th{background:#f4f4f4!important;color:#333!important}
+  table.data-table tr:hover td{background:transparent!important}
+  .summary-bar{background:#f4f4f4!important;border:1px solid #d0d0d0!important}
+  .inline-stats{border-bottom:1px solid #eee;padding-bottom:12px}
+  .page-header{page-break-after:avoid}
+  #print-header{display:flex!important}
+  .agent-filter-bar{display:none!important}
+}
+#print-header{display:none;align-items:center;justify-content:space-between;padding:0 0 16px;margin-bottom:16px;border-bottom:2px solid #111;font-family:var(--font-head)}
+#print-header .ph-title{font-size:1.1rem;font-weight:800}
+#print-header .ph-meta{font-size:.8rem;color:#555}
 `
 
 const DASHBOARD_LOGIC = `
@@ -1488,7 +1571,7 @@ function renderCustomSections(){
 
 function renderAll(){
   loadConfig();
-  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();
+  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();renderAIReport();
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
   // Wire up collapsible block headers + agent filter chips via event delegation
@@ -1879,6 +1962,124 @@ function renderPinball(){
 }
 
 function showSection(name){document.querySelectorAll('.section-view').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));document.getElementById('section-'+name).classList.add('active');document.querySelector('.nav-item[data-section="'+name+'"]').classList.add('active');}
+
+// ── AI Insights ───────────────────────────────────────────────
+function renderAIReport(){
+  const el=document.getElementById('ai-report-content');
+  if(!el)return;
+  const s=state;
+  const hasData=s&&s.hasData;
+  const cached=window.__aiReportCache;
+  if(!hasData){el.innerHTML='<div class="empty-state" style="padding:60px 20px"><div class="empty-state-msg" style="font-size:1rem">Run the report first to load ticket data, then generate AI insights.</div></div>';return;}
+  const periodLabel='Last '+s.lookbackDays+' days';
+  const genBtnHTML='<button class="ai-generate-btn" onclick="generateAIReport()" id="ai-gen-btn">🤖 Generate Weekly Insights</button>';
+  const headerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#4f8eff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">🤖 AI Insights</div><div class="page-subtitle">AI-generated analysis of recurring issues and operational recommendations</div></div><div class="period-badge">'+periodLabel+'</div></div>';
+  if(!cached){
+    el.innerHTML=headerHTML+'<div class="section-block" style="border-color:rgba(167,139,250,.3)"><div class="section-block-body" style="padding:32px;text-align:center">'+
+      '<div style="font-size:2.5rem;margin-bottom:16px">🤖</div>'+
+      '<div style="font-family:var(--font-head);font-size:1.2rem;font-weight:800;margin-bottom:8px">Ready to analyse '+s.tickets.length+' tickets</div>'+
+      '<div style="color:var(--text-2);margin-bottom:24px;max-width:420px;margin-left:auto;margin-right:auto">Click below to get an AI-powered overview of recurring issues, trends, and operational recommendations for this period.</div>'+
+      genBtnHTML+'</div></div>';
+    return;
+  }
+  const d=new Date(cached.generatedAt);
+  const dateStr=d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=headerHTML+
+    '<div class="section-block" style="border-color:rgba(167,139,250,.3)">'+
+    '<div class="section-block-header" style="background:var(--purple-soft)"><div><div class="section-block-title"><span class="color-dot dot-purple"></span>AI Analysis Report</div><div class="section-block-subtitle">Generated '+dateStr+' · '+s.tickets.length+' tickets analysed</div></div><button class="btn btn-ghost" onclick="generateAIReport()" style="font-size:.8rem;padding:5px 10px">↻ Regenerate</button></div>'+
+    '<div class="section-block-body"><div class="ai-report-body">'+markdownToHtml(cached.report)+'</div></div>'+
+    '</div>';
+}
+
+function markdownToHtml(md){
+  return md
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+    .replace(/^### (.+)$/gm,'<h3>$1</h3>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/^(\d+)\. (.+)$/gm,'<li><strong>$1.</strong> $2</li>')
+    .replace(/^[•\-\*] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]+?<\/li>)(?=\s*<li>|$)/g,function(m){return '<ul>'+m+'</ul>';})
+    .replace(/<\/ul>\s*<ul>/g,'')
+    .replace(/\n\n/g,'</p><p>')
+    .replace(/\n/g,'<br>')
+    .replace(/^(?!<[hup])(.+)$/gm,'<p>$1</p>')
+    .replace(/<p><\/p>/g,'')
+    .replace(/<p>(<[hul])/g,'$1')
+    .replace(/(<\/[hul][^>]*>)<\/p>/g,'$1');
+}
+
+function buildTicketSummary(){
+  const s=state;
+  const{tickets,ticketsPrev,lookbackDays,fieldMap}=s;
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const resfid=fieldMap[FIELD_NAMES.RESOLUTION.toLowerCase()];
+  const rvfid=fieldMap[FIELD_NAMES.REFUND_VALUE.toLowerCase()];
+  // Status counts
+  function statusC(tix){return{open:tix.filter(t=>t.status==='open').length,closed:tix.filter(t=>t.status==='closed').length,pending:tix.filter(t=>t.status==='pending').length};}
+  // Top reasons
+  const reasonGroups={};
+  tickets.forEach(t=>{const r=getFieldById(t,rid)||'Unknown';reasonGroups[r]=(reasonGroups[r]||0)+1;});
+  const topReasons=Object.entries(reasonGroups).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([r,c])=>({reason:r,count:c,pct:Math.round(c/tickets.length*100)}));
+  // Top products
+  const prodGroups={};
+  tickets.forEach(t=>{const p=getFieldById(t,pid)||'Unknown';prodGroups[p]=(prodGroups[p]||0)+1;});
+  const topProducts=Object.entries(prodGroups).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([p,c])=>({product:p,count:c}));
+  // Section counts
+  const pool=tickets.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
+  const arcade=tickets.filter(t=>ARCADE_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p))&&matchesValue(getFieldById(t,rid),ARCADE_REASON));
+  const pinball=tickets.filter(t=>KELVIN_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p))&&KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const courier=tickets.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const ops=tickets.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const refunds=tickets.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const replacements=tickets.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const refundVal=sumMoney(refunds,rvfid);
+  const poolP=ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
+  const arcadeP=ticketsPrev.filter(t=>ARCADE_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p))&&matchesValue(getFieldById(t,rid),ARCADE_REASON));
+  const courierP=ticketsPrev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const opsP=ticketsPrev.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  return{
+    period:{days:lookbackDays,label:'Last '+lookbackDays+' days'},
+    totals:{current:tickets.length,previous:ticketsPrev.length,changePct:ticketsPrev.length?Math.round((tickets.length-ticketsPrev.length)/ticketsPrev.length*100):null},
+    statusBreakdown:statusC(tickets),
+    sections:{
+      poolTables:{current:pool.length,previous:poolP.length},
+      arcadeMachines:{current:arcade.length,previous:arcadeP.length},
+      pinballMachines:{current:pinball.length,previous:0},
+      courierIssues:{current:courier.length,previous:courierP.length},
+      opsIssues:{current:ops.length,previous:opsP.length},
+      refunds:{count:refunds.length,replacements:replacements.length,totalValue:'$'+refundVal.toFixed(2)},
+    },
+    topContactReasons:topReasons,
+    topProducts:topProducts,
+  };
+}
+
+async function generateAIReport(){
+  const btn=document.getElementById('ai-gen-btn');
+  const el=document.getElementById('ai-report-content');
+  if(!state||!state.hasData){alert('Please run the report first.');return;}
+  // Show thinking state
+  const s=state;
+  const periodLabel='Last '+s.lookbackDays+' days';
+  el.innerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#4f8eff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">🤖 AI Insights</div><div class="page-subtitle">AI-generated analysis of recurring issues and operational recommendations</div></div><div class="period-badge">'+periodLabel+'</div></div>'+
+    '<div class="section-block" style="border-color:rgba(167,139,250,.3)"><div class="section-block-body" style="padding:28px">'+
+    '<div class="ai-thinking"><div class="spin"></div> Analysing '+s.tickets.length+' tickets — this takes about 10 seconds…</div></div></div>';
+  try{
+    const summary=buildTicketSummary();
+    const result=await window.__authFetch('/api/ai-report',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({summary})});
+    window.__aiReportCache={report:result.report,generatedAt:result.generatedAt};
+    renderAIReport();
+  }catch(err){
+    el.innerHTML='<div class="page-header"><div><div class="page-title accent-red">🤖 AI Insights</div></div></div>'+
+      '<div class="section-block"><div class="section-block-body"><div style="color:var(--red);padding:16px">'+
+      (err.message||'Failed to generate report')+
+      '<br><br><small style="color:var(--text-3)">Make sure ANTHROPIC_API_KEY is set in your Vercel environment variables.</small>'+
+      '</div></div></div>';
+  }
+}
 
 function showLoading(show){const el=document.getElementById('loading-overlay');if(show){el.classList.add('visible');document.getElementById('loading-log').innerHTML='';document.getElementById('loading-bar').style.width='0%';}else{el.classList.remove('visible');}}
 `
