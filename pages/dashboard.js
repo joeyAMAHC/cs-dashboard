@@ -87,21 +87,22 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
   })
 
   useEffect(() => {
-    // Load any saved config into window before injecting the script
+    // Load saved config
     try {
       const saved = localStorage.getItem('__dashConfig')
       if (saved) window.__dashConfig = JSON.parse(saved)
     } catch(e) {}
 
+    // Expose auth helpers and dashboard functions on window
     window.__authFetch = authFetch
     window.__authPost = authPost
-    // Remove any existing script first
-    const existing = document.getElementById('__dashboard_logic')
-    if (existing) existing.remove()
-    const script = document.createElement('script')
-    script.id = '__dashboard_logic'
-    script.appendChild(document.createTextNode(DASHBOARD_LOGIC))
-    document.body.appendChild(script)
+    window.__runReport = runReport
+    window.__showSection = showSection
+    window.toggleBlock = toggleBlock
+    window.__renderAll = renderAll
+    window.__toggleAgent = toggleAgent
+    window.__generateAIReport = generateAIReport
+
     return () => {
       delete window.__authFetch
       delete window.__authPost
@@ -112,8 +113,6 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
       delete window.__toggleAgent
       delete window.__generateAIReport
       delete window.__state
-      const el = document.getElementById('__dashboard_logic')
-      if (el) el.remove()
     }
   }, [])
 
@@ -1372,15 +1371,12 @@ table.ticket-table td:first-child{font-family:var(--font-data);font-size:.75rem;
 #print-header .ph-meta{font-size:.8rem;color:#555}
 `
 
-const DASHBOARD_LOGIC = `
 // ── Config — reads from window.__dashConfig (set by SettingsPanel) with fallbacks ──
-var _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
-var FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,COURIER_REASONS,OPS_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
+const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
+let FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,COURIER_REASONS,OPS_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
 function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER};POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
-try{loadConfig();}catch(e){console.error('loadConfig error:',e);}
-
 // ── Collapsible blocks ───────────────────────────────────────
-var collapseState={};
+let collapseState={};
 function toggleBlock(id){
   const body=document.getElementById('block-body-'+id);
   const hdr=document.getElementById('block-hdr-'+id);
@@ -1402,7 +1398,7 @@ function makeCollapsible(id){
 }
 
 // ── Section block HTML builder ───────────────────────────────
-var _blockId=0;
+let _blockId=0;
 function sectionBlock({title,subtitle,dot,headerBg,borderColor,bodyHtml,summaryItems}){
   const id='blk'+(++_blockId);
   const dotHtml=dot?'<span class="color-dot '+dot+'"></span>':'';
@@ -1435,8 +1431,8 @@ function deltaChip(curr,prev,goodWhenDown=true){
   return'<span class="delta-chip '+cls+'">'+arrow+' '+pStr+'</span>';
 }
 
-var state={fieldMap:{},tickets:[],ticketsPrev:[],lookbackDays:30,hasData:false,prevLabel:''};
-var agentFilter=[];// [] = all agents shown
+let state={fieldMap:{},tickets:[],ticketsPrev:[],lookbackDays:30,hasData:false,prevLabel:''};
+let agentFilter=[];// [] = all agents shown
 function toggleAgent(name){
   if(name==='__all'){agentFilter=[];}
   else if(agentFilter.includes(name)){agentFilter=agentFilter.filter(a=>a!==name);}
@@ -2000,7 +1996,7 @@ function renderAIReport(){
   const cached=window.__aiReportCache;
   if(!hasData){el.innerHTML='<div class="empty-state" style="padding:60px 20px"><div class="empty-state-msg" style="font-size:1rem">Run the report first to load ticket data, then generate AI insights.</div></div>';return;}
   const periodLabel='Last '+s.lookbackDays+' days';
-  const genBtnHTML='<button class="ai-generate-btn" onclick="generateAIReport()" id="ai-gen-btn">🤖 Generate Weekly Insights</button>';
+  const genBtnHTML='<button class="ai-generate-btn" onclick="window.__generateAIReport()" id="ai-gen-btn">🤖 Generate Weekly Insights</button>';
   const headerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#4f8eff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">🤖 AI Insights</div><div class="page-subtitle">AI-generated analysis of recurring issues and operational recommendations</div></div><div class="period-badge">'+periodLabel+'</div></div>';
   if(!cached){
     el.innerHTML=headerHTML+'<div class="section-block" style="border-color:rgba(167,139,250,.3)"><div class="section-block-body" style="padding:32px;text-align:center">'+
@@ -2014,7 +2010,7 @@ function renderAIReport(){
   const dateStr=d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
   el.innerHTML=headerHTML+
     '<div class="section-block" style="border-color:rgba(167,139,250,.3)">'+
-    '<div class="section-block-header" style="background:var(--purple-soft)"><div><div class="section-block-title"><span class="color-dot dot-purple"></span>AI Analysis Report</div><div class="section-block-subtitle">Generated '+dateStr+' · '+s.tickets.length+' tickets analysed</div></div><button class="btn btn-ghost" onclick="generateAIReport()" style="font-size:.8rem;padding:5px 10px">↻ Regenerate</button></div>'+
+    '<div class="section-block-header" style="background:var(--purple-soft)"><div><div class="section-block-title"><span class="color-dot dot-purple"></span>AI Analysis Report</div><div class="section-block-subtitle">Generated '+dateStr+' · '+s.tickets.length+' tickets analysed</div></div><button class="btn btn-ghost" onclick="window.__generateAIReport()" style="font-size:.8rem;padding:5px 10px">↻ Regenerate</button></div>'+
     '<div class="section-block-body"><div class="ai-report-body">'+markdownToHtml(cached.report)+'</div></div>'+
     '</div>';
 }
@@ -2110,5 +2106,3 @@ async function generateAIReport(){
 }
 
 function showLoading(show){const el=document.getElementById('loading-overlay');if(show){el.classList.add('visible');document.getElementById('loading-log').innerHTML='';document.getElementById('loading-bar').style.width='0%';}else{el.classList.remove('visible');}}
-window.__runReport=runReport;window.__showSection=showSection;window.toggleBlock=toggleBlock;window.__renderAll=renderAll;window.__toggleAgent=toggleAgent;window.__generateAIReport=generateAIReport;
-`
