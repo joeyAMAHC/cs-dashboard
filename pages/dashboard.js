@@ -60,6 +60,11 @@ export default function Dashboard() {
 // ── The full dashboard UI ────────────────────────────────────
 function DashboardApp({ user, onSignOut, authFetch }) {
   const [showSettings, setShowSettings] = useState(false)
+  const [customSections, setCustomSections] = useState(() => {
+    if (typeof window === 'undefined') return []
+    try { const s = localStorage.getItem('__dashConfig'); if (s) return JSON.parse(s).customSections || [] } catch(e) {}
+    return []
+  })
 
   useEffect(() => {
     // Load any saved config into window before injecting the script
@@ -134,6 +139,15 @@ function DashboardApp({ user, onSignOut, authFetch }) {
               <span className="nav-badge" id={`badge-${id}`}>—</span>
             </div>
           ))}
+          {customSections.length > 0 && <>
+            <div className="nav-section-label" style={{ marginTop: 12 }}>Custom</div>
+            {customSections.map(({ id, icon, label }) => (
+              <div key={id} className="nav-item" data-section={id} onClick={() => window.__showSection(id)}>
+                <span className="nav-icon">{icon || '📊'}</span> {label}
+                <span className="nav-badge" id={`badge-${id}`}>—</span>
+              </div>
+            ))}
+          </>}
           <div className="nav-section-label" style={{ marginTop: 12 }}>Analysis</div>
           <div className="nav-item" data-section="comparison" onClick={() => window.__showSection('comparison')}>
             <span className="nav-icon">📅</span> MoM Comparison
@@ -167,6 +181,14 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             </div>
           ))}
 
+          {customSections.map(({ id }) => (
+            <div key={id} id={`section-${id}`} className="section-view">
+              <div id={`${id}-content`}>
+                <div className="empty-state"><div className="empty-state-msg">Run the report to load data</div></div>
+              </div>
+            </div>
+          ))}
+
           <div id="section-comparison" className="section-view">
             <ComparisonSection authFetch={authFetch} />
           </div>
@@ -188,8 +210,11 @@ function DashboardApp({ user, onSignOut, authFetch }) {
         <SettingsPanel
           onClose={() => setShowSettings(false)}
           authFetch={authFetch}
-          onApply={() => {
-            if (window.__renderAll && window.__state && window.__state.hasData) window.__renderAll()
+          onSave={(cfg) => {
+            setCustomSections(cfg.customSections || [])
+            setTimeout(() => {
+              if (window.__renderAll && window.__state && window.__state.hasData) window.__renderAll()
+            }, 100)
           }}
         />
       )}
@@ -211,10 +236,14 @@ const DEFAULT_DASH_CONFIG = {
   courier: { reasons: ['Item Missing::Courier Fault', 'WISMO::Item Delayed::Courier Fault', 'WISMO::Wrong Address::Customer Fault', 'Item Damaged::Courier Fault'] },
   ops: { reasons: ['Item Missing::Picking Issue::Ops Mistake', 'WISMO::Tracking Not Supplied', 'WISMO::Item Delayed::Ops Delay', 'WISMO::Wrong Address::Ops Fault', 'Wrong Item Delivered::Ops Misorder'] },
   refunds: { refundValues: ['Refund', 'Partial Refund'], replacementValues: ['Free Product Upgrade', 'Free Gift', 'Replacement Sent'] },
+  extraBlocks: { pool: [], arcade: [], pinball: [], courier: [], ops: [], refunds: [] },
+  customSections: [],
 }
 
-function SettingsPanel({ onClose, authFetch, onApply }) {
+function SettingsPanel({ onClose, authFetch, onSave }) {
   const [tab, setTab] = useState('fields')
+  const [addingSection, setAddingSection] = useState(false)
+  const [editingSectionIdx, setEditingSectionIdx] = useState(null)
   const [config, setConfig] = useState(() => {
     if (typeof window === 'undefined') return JSON.parse(JSON.stringify(DEFAULT_DASH_CONFIG))
     try { const s = localStorage.getItem('__dashConfig'); if (s) return JSON.parse(s) } catch(e) {}
@@ -261,7 +290,7 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
   function save() {
     localStorage.setItem('__dashConfig', JSON.stringify(config))
     window.__dashConfig = config
-    onApply()
+    onSave(config)
     onClose()
   }
 
@@ -296,7 +325,7 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
   const secStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginBottom: 16 }
   const secTitle = { fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: '.9rem', marginBottom: 12, color: 'var(--text-1)' }
   const fldLabel = { fontSize: '.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-2)', marginBottom: 6, marginTop: 12 }
-  const TABS = [['fields','Field Mapping'],['pool','🎱 Pool'],['arcade','🕹 Arcades'],['pinball','🎰 Pinball'],['courier','🚚 Courier'],['ops','⚙️ Ops'],['refunds','💰 Refunds']]
+  const TABS = [['fields','Field Mapping'],['pool','🎱 Pool'],['arcade','🕹 Arcades'],['pinball','🎰 Pinball'],['courier','🚚 Courier'],['ops','⚙️ Ops'],['refunds','💰 Refunds'],['sections','＋ Sections']]
 
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', zIndex:200, display:'flex', justifyContent:'flex-end' }}
@@ -368,6 +397,7 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
                 <div style={fldLabel}>Courier fault reason</div>
                 <SPicker value={config.pool.courierReason} available={reasonsAvail} onChange={v => upd('pool.courierReason', v)} iStyle={iStyle} />
               </div>
+              <ExtraBlocksSection sectionKey="pool" config={config} upd={upd} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} />
             </div>
           )}
 
@@ -383,6 +413,7 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
                 <div style={secTitle}>Filter by Contact Reason (single)</div>
                 <SPicker value={config.arcade.reason} available={reasonsAvail} onChange={v => upd('arcade.reason', v)} iStyle={iStyle} />
               </div>
+              <ExtraBlocksSection sectionKey="arcade" config={config} upd={upd} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} />
             </div>
           )}
 
@@ -398,6 +429,7 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
                 <div style={secTitle}>Contact Reasons (filter)</div>
                 <LEditor values={config.pinball.reasons} available={reasonsAvail} onChange={v => upd('pinball.reasons', v)} iStyle={iStyle} ph="e.g. Item Not Working" />
               </div>
+              <ExtraBlocksSection sectionKey="pinball" config={config} upd={upd} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} />
             </div>
           )}
 
@@ -409,6 +441,7 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
                 <div style={secTitle}>Courier Contact Reasons</div>
                 <LEditor values={config.courier.reasons} available={reasonsAvail} onChange={v => upd('courier.reasons', v)} iStyle={iStyle} ph="e.g. Item Missing::Courier Fault" />
               </div>
+              <ExtraBlocksSection sectionKey="courier" config={config} upd={upd} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} />
             </div>
           )}
 
@@ -420,6 +453,7 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
                 <div style={secTitle}>Ops Contact Reasons</div>
                 <LEditor values={config.ops.reasons} available={reasonsAvail} onChange={v => upd('ops.reasons', v)} iStyle={iStyle} ph="e.g. Item Missing::Picking Issue::Ops Mistake" />
               </div>
+              <ExtraBlocksSection sectionKey="ops" config={config} upd={upd} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} />
             </div>
           )}
 
@@ -435,6 +469,42 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
                 <div style={secTitle}>Replacement Values</div>
                 <LEditor values={config.refunds.replacementValues} available={resolutionAvail} onChange={v => upd('refunds.replacementValues', v)} iStyle={iStyle} ph="e.g. Replacement Sent" />
               </div>
+              <ExtraBlocksSection sectionKey="refunds" config={config} upd={upd} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} />
+            </div>
+          )}
+
+          {/* ── Custom Sections ── */}
+          {tab === 'sections' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>
+                Create entirely new sidebar sections with custom breakdown blocks. Each section can optionally be scoped to a specific product.
+              </p>
+              {(config.customSections || []).map((section, i) => (
+                editingSectionIdx === i ? (
+                  <SectionForm key={section.id} section={section} gorgiasFields={gorgiasFields} productsAvail={productsAvail} ticketValues={ticketValues} iStyle={iStyle}
+                    onSave={s => { const next=[...(config.customSections||[])]; next[i]=s; upd('customSections', next); setEditingSectionIdx(null) }}
+                    onCancel={() => setEditingSectionIdx(null)} />
+                ) : (
+                  <div key={section.id} style={{ background:'var(--bg-elevated)', border:'1px solid var(--border)', borderRadius:8, padding:'12px 16px', marginBottom:10, display:'flex', alignItems:'center' }}>
+                    <span style={{ fontSize:'1.3rem', marginRight:10 }}>{section.icon || '📊'}</span>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:600, color:'var(--text-1)', fontSize:'.9rem' }}>{section.label}</div>
+                      <div style={{ fontSize:'.75rem', color:'var(--text-3)', marginTop:2 }}>{(section.blocks||[]).length} block{(section.blocks||[]).length !== 1 ? 's' : ''} · {section.productFilter ? 'Product: '+section.productFilter : 'All products'}</div>
+                    </div>
+                    <button onClick={() => setEditingSectionIdx(i)} style={{ background:'none', border:'none', color:'var(--blue)', cursor:'pointer', fontSize:'.82rem', padding:'4px 8px', fontFamily:'var(--font-body)' }}>Edit</button>
+                    <button onClick={() => { if(confirm('Delete this section?')){ const next=[...(config.customSections||[])]; next.splice(i,1); upd('customSections', next) } }} style={{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.82rem', padding:'4px 8px', fontFamily:'var(--font-body)' }}>Delete</button>
+                  </div>
+                )
+              ))}
+              {addingSection ? (
+                <SectionForm section={{ id:'cs'+Date.now(), label:'', icon:'📊', subtitle:'', productFilter:'', blocks:[] }} gorgiasFields={gorgiasFields} productsAvail={productsAvail} ticketValues={ticketValues} iStyle={iStyle}
+                  onSave={s => { upd('customSections', [...(config.customSections||[]), s]); setAddingSection(false) }}
+                  onCancel={() => setAddingSection(false)} />
+              ) : (
+                <button onClick={() => setAddingSection(true)} style={{ background:'var(--bg-elevated)', border:'1px dashed var(--border)', color:'var(--blue)', borderRadius:8, padding:'14px 20px', cursor:'pointer', fontFamily:'var(--font-head)', fontSize:'.9rem', fontWeight:700, width:'100%' }}>
+                  + Create New Section
+                </button>
+              )}
             </div>
           )}
 
@@ -453,6 +523,152 @@ function SettingsPanel({ onClose, authFetch, onApply }) {
           </div>
         </div>
 
+      </div>
+    </div>
+  )
+}
+
+// ── Block Editor ─────────────────────────────────────────────
+function BlockEditor({ block: init, gorgiasFields, ticketValues, iStyle, onSave, onCancel }) {
+  const [b, setB] = useState(init)
+  const fLabels = gorgiasFields.map(f => f.label)
+  const filterValsAvail = b.filterField ? (ticketValues[(b.filterField||'').toLowerCase()] || []) : []
+  function updB(k, v) { setB(p => ({...p, [k]: v})) }
+  const lbl = { fontSize:'.72rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--text-2)', marginBottom:5, marginTop:10 }
+  const FieldSelect = ({ val, onChange, placeholder }) => fLabels.length > 0
+    ? <select value={val||''} onChange={e=>onChange(e.target.value)} style={{...iStyle,cursor:'pointer'}}><option value="">-- none --</option>{fLabels.map(l=><option key={l} value={l}>{l}</option>)}{val&&!fLabels.includes(val)&&<option value={val}>{val} (current)</option>}</select>
+    : <input value={val||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={iStyle} />
+  return (
+    <div style={{ background:'var(--bg-canvas)', border:'1px solid rgba(79,142,255,.3)', borderRadius:8, padding:16, marginTop:8 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <div><div style={lbl}>Block Title *</div><input value={b.title||''} onChange={e=>updB('title',e.target.value)} placeholder="e.g. Warranty Claims" style={iStyle} /></div>
+        <div><div style={lbl}>Dot Colour</div>
+          <select value={b.dot||'dot-blue'} onChange={e=>updB('dot',e.target.value)} style={{...iStyle,cursor:'pointer'}}>
+            {[['dot-blue','Blue'],['dot-green','Green'],['dot-amber','Amber'],['dot-red','Red'],['dot-purple','Purple'],['dot-cyan','Cyan']].map(([v,l])=><option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:4 }}>
+        <div><div style={lbl}>Filter by Field</div><FieldSelect val={b.filterField} onChange={v=>updB('filterField',v)} placeholder="e.g. Contact Reason" /></div>
+        <div><div style={lbl}>Break Down / Group By</div><FieldSelect val={b.groupField} onChange={v=>updB('groupField',v)} placeholder="e.g. Pool Table Damage" /></div>
+      </div>
+      {b.filterField && (
+        <div style={{ marginTop:8 }}>
+          <div style={lbl}>Filter Values (show tickets matching any of these)</div>
+          <LEditor values={b.filterValues||[]} available={filterValsAvail} onChange={v=>updB('filterValues',v)} iStyle={iStyle} ph="e.g. Warranty Claim" />
+        </div>
+      )}
+      {b.groupField && (
+        <div style={{ marginTop:8 }}>
+          <div style={lbl}>Breakdown Column Header</div>
+          <input value={b.groupLabel||''} onChange={e=>updB('groupLabel',e.target.value)} placeholder={b.groupField||'Value'} style={iStyle} />
+        </div>
+      )}
+      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:14 }}>
+        <button onClick={onCancel} style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-2)', borderRadius:6, padding:'7px 14px', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:'.84rem' }}>Cancel</button>
+        <button onClick={()=>b.title&&onSave(b)} disabled={!b.title} style={{ background:b.title?'var(--blue)':'var(--bg-elevated)', color:b.title?'#fff':'var(--text-3)', border:'none', borderRadius:6, padding:'7px 16px', cursor:b.title?'pointer':'default', fontFamily:'var(--font-body)', fontWeight:600, fontSize:'.84rem' }}>Save Block</button>
+      </div>
+    </div>
+  )
+}
+
+// ── Extra Blocks Section (embedded in each section tab) ───────
+function ExtraBlocksSection({ sectionKey, config, upd, gorgiasFields, ticketValues, iStyle }) {
+  const [addingBlock, setAddingBlock] = useState(false)
+  const [editingIdx, setEditingIdx] = useState(null)
+  const blocks = config.extraBlocks?.[sectionKey] || []
+  const newBlock = () => ({ id: 'b'+Date.now(), title:'', dot:'dot-blue', filterField:'', filterValues:[], groupField:'', groupLabel:'' })
+  function saveBlock(idx, block) {
+    const next=[...blocks]; if(idx===null) next.push(block); else next[idx]=block
+    upd('extraBlocks.'+sectionKey, next); setAddingBlock(false); setEditingIdx(null)
+  }
+  function deleteBlock(idx) {
+    if(!confirm('Delete this block?')) return
+    const next=[...blocks]; next.splice(idx,1); upd('extraBlocks.'+sectionKey, next)
+  }
+  return (
+    <div style={{ marginTop:16, paddingTop:16, borderTop:'1px solid var(--border)' }}>
+      <div style={{ fontFamily:'var(--font-head)', fontWeight:700, fontSize:'.88rem', marginBottom:6, color:'var(--text-1)' }}>Additional Blocks</div>
+      <p style={{ color:'var(--text-2)', fontSize:'.82rem', marginBottom:10, lineHeight:1.5 }}>Add custom breakdown blocks to this section. Each block filters tickets and groups by a field of your choice.</p>
+      {blocks.map((block, i) => (
+        editingIdx === i
+          ? <BlockEditor key={block.id} block={block} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} onSave={b=>saveBlock(i,b)} onCancel={()=>setEditingIdx(null)} />
+          : <div key={block.id} style={{ display:'flex', alignItems:'center', background:'var(--bg-elevated)', border:'1px solid var(--border)', borderRadius:6, padding:'10px 12px', marginBottom:6 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:600, fontSize:'.85rem', color:'var(--text-1)' }}>{block.title}</div>
+                <div style={{ fontSize:'.73rem', color:'var(--text-3)', marginTop:2 }}>
+                  {block.filterField&&`Filter: ${block.filterField}${block.filterValues?.length?` (${block.filterValues.length} value${block.filterValues.length>1?'s':''})`:''}  `}
+                  {block.groupField&&`Group: ${block.groupField}`}
+                </div>
+              </div>
+              <button onClick={()=>setEditingIdx(i)} style={{ background:'none', border:'none', color:'var(--blue)', cursor:'pointer', fontSize:'.82rem', padding:'4px 8px', fontFamily:'var(--font-body)' }}>Edit</button>
+              <button onClick={()=>deleteBlock(i)} style={{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.82rem', padding:'4px 8px', fontFamily:'var(--font-body)' }}>Delete</button>
+            </div>
+      ))}
+      {addingBlock
+        ? <BlockEditor block={newBlock()} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} onSave={b=>saveBlock(null,b)} onCancel={()=>setAddingBlock(false)} />
+        : <button onClick={()=>setAddingBlock(true)} style={{ background:'var(--bg-elevated)', border:'1px dashed var(--border)', color:'var(--text-2)', borderRadius:6, padding:'8px 16px', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:'.83rem', width:'100%', marginTop:4 }}>+ Add Block</button>
+      }
+    </div>
+  )
+}
+
+// ── Section Form (create / edit a custom top-level section) ───
+function SectionForm({ section: init, gorgiasFields, productsAvail, ticketValues, iStyle, onSave, onCancel }) {
+  const [s, setS] = useState(init)
+  const [addingBlock, setAddingBlock] = useState(false)
+  const [editingBlockIdx, setEditingBlockIdx] = useState(null)
+  function updS(k,v){ setS(p=>({...p,[k]:v})) }
+  const newBlock = () => ({ id:'b'+Date.now(), title:'', dot:'dot-blue', filterField:'', filterValues:[], groupField:'', groupLabel:'' })
+  function saveBlock(idx, block) {
+    const next=[...(s.blocks||[])]; if(idx===null) next.push(block); else next[idx]=block
+    setS(p=>({...p, blocks:next})); setAddingBlock(false); setEditingBlockIdx(null)
+  }
+  function deleteBlock(idx) {
+    if(!confirm('Delete this block?')) return
+    const next=[...(s.blocks||[])]; next.splice(idx,1); setS(p=>({...p, blocks:next}))
+  }
+  const lbl = { fontSize:'.72rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--text-2)', marginBottom:5, marginTop:10 }
+  return (
+    <div style={{ background:'var(--bg-canvas)', border:'1px solid rgba(79,142,255,.3)', borderRadius:8, padding:16, marginBottom:12 }}>
+      <div style={{ fontFamily:'var(--font-head)', fontWeight:700, fontSize:'.95rem', marginBottom:12 }}>{init.label?`Edit: ${init.label}`:'New Section'}</div>
+      <div style={{ display:'grid', gridTemplateColumns:'64px 1fr 1fr', gap:12 }}>
+        <div><div style={lbl}>Icon</div><input value={s.icon||''} onChange={e=>updS('icon',e.target.value)} placeholder="📊" style={{...iStyle,textAlign:'center',fontSize:'1.2rem'}} /></div>
+        <div><div style={lbl}>Section Label *</div><input value={s.label||''} onChange={e=>updS('label',e.target.value)} placeholder="e.g. Warranties" style={iStyle} /></div>
+        <div><div style={lbl}>Subtitle</div><input value={s.subtitle||''} onChange={e=>updS('subtitle',e.target.value)} placeholder="e.g. Warranty claims across all products" style={iStyle} /></div>
+      </div>
+      <div style={{ marginTop:8 }}>
+        <div style={lbl}>Product Filter (optional — leave blank for all products)</div>
+        {productsAvail.length>0
+          ? <select value={s.productFilter||''} onChange={e=>updS('productFilter',e.target.value)} style={{...iStyle,cursor:'pointer'}}><option value="">All products</option>{productsAvail.map(v=><option key={v} value={v}>{v}</option>)}{s.productFilter&&!productsAvail.includes(s.productFilter)&&<option value={s.productFilter}>{s.productFilter} (current)</option>}</select>
+          : <input value={s.productFilter||''} onChange={e=>updS('productFilter',e.target.value)} placeholder="Leave blank for all, or e.g. CSLT Pool Tables" style={iStyle} />
+        }
+      </div>
+      <div style={{ marginTop:14, paddingTop:12, borderTop:'1px solid var(--border)' }}>
+        <div style={{ fontFamily:'var(--font-head)', fontWeight:700, fontSize:'.85rem', marginBottom:8 }}>Blocks ({(s.blocks||[]).length})</div>
+        {(s.blocks||[]).map((block,i)=>(
+          editingBlockIdx===i
+            ? <BlockEditor key={block.id} block={block} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} onSave={b=>saveBlock(i,b)} onCancel={()=>setEditingBlockIdx(null)} />
+            : <div key={block.id} style={{ display:'flex', alignItems:'center', background:'var(--bg-elevated)', border:'1px solid var(--border)', borderRadius:6, padding:'8px 12px', marginBottom:6 }}>
+                <div style={{ flex:1 }}>
+                  <div style={{ fontWeight:600, fontSize:'.84rem' }}>{block.title}</div>
+                  <div style={{ fontSize:'.73rem', color:'var(--text-3)', marginTop:2 }}>
+                    {block.filterField&&`Filter: ${block.filterField}${block.filterValues?.length?` (${block.filterValues.length} values)`:''}`}
+                    {block.groupField&&` · Group: ${block.groupField}`}
+                  </div>
+                </div>
+                <button onClick={()=>setEditingBlockIdx(i)} style={{ background:'none', border:'none', color:'var(--blue)', cursor:'pointer', fontSize:'.8rem', padding:'4px 6px', fontFamily:'var(--font-body)' }}>Edit</button>
+                <button onClick={()=>deleteBlock(i)} style={{ background:'none', border:'none', color:'var(--red)', cursor:'pointer', fontSize:'.8rem', padding:'4px 6px', fontFamily:'var(--font-body)' }}>✕</button>
+              </div>
+        ))}
+        {addingBlock
+          ? <BlockEditor block={newBlock()} gorgiasFields={gorgiasFields} ticketValues={ticketValues} iStyle={iStyle} onSave={b=>saveBlock(null,b)} onCancel={()=>setAddingBlock(false)} />
+          : <button onClick={()=>setAddingBlock(true)} style={{ background:'var(--bg-elevated)', border:'1px dashed var(--border)', color:'var(--text-2)', borderRadius:6, padding:'8px 16px', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:'.83rem', width:'100%' }}>+ Add Block to this Section</button>
+        }
+      </div>
+      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:14, paddingTop:12, borderTop:'1px solid var(--border)' }}>
+        <button onClick={onCancel} style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-2)', borderRadius:6, padding:'7px 14px', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:'.84rem' }}>Cancel</button>
+        <button onClick={()=>s.label&&onSave(s)} disabled={!s.label} style={{ background:s.label?'var(--blue)':'var(--bg-elevated)', color:s.label?'#fff':'var(--text-3)', border:'none', borderRadius:6, padding:'7px 16px', cursor:s.label?'pointer':'default', fontFamily:'var(--font-body)', fontWeight:600, fontSize:'.84rem' }}>Save Section</button>
       </div>
     </div>
   )
@@ -1092,9 +1308,50 @@ async function runReport(){
 
 function updateBadges(){document.getElementById('badge-overview').textContent=state.tickets.length;}
 
+// ── Dynamic block renderer ─────────────────────────────────────
+function renderDynamicBlock(block,tickets,ticketsPrev,fieldMap){
+  if(!block||!block.title)return'';
+  let tix=tickets,prev=ticketsPrev;
+  if(block.filterField&&block.filterValues&&block.filterValues.length){
+    const fid=fieldMap[block.filterField.toLowerCase()];
+    if(fid){tix=tickets.filter(t=>block.filterValues.some(v=>getFieldById(t,fid).toLowerCase()===v.toLowerCase()));prev=ticketsPrev.filter(t=>block.filterValues.some(v=>getFieldById(t,fid).toLowerCase()===v.toLowerCase()));}
+  }
+  const gfid=block.groupField?fieldMap[block.groupField.toLowerCase()]:null;
+  const sc=statusCounts(tix);const avg=avgResHours(tix);
+  const byGroup=gfid?sortedEntries(groupBy(tix,t=>getFieldById(t,gfid))):[];
+  const prevByGroup=gfid?groupBy(prev,t=>getFieldById(t,gfid)):{};
+  const bodyHtml=(gfid&&byGroup.length)?breakdownTable(byGroup,esc(block.groupLabel||block.groupField||'Value'),label=>(prevByGroup[label]||[])):inlineStats(tix,prev,state.tickets.length);
+  return sectionBlock({title:esc(block.title)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length,dot:block.dot||'dot-blue',summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],bodyHtml:bodyHtml});
+}
+
+// ── Render extra blocks for an existing section ────────────────
+function renderExtraBlocks(sectionKey){
+  const{tickets,ticketsPrev,fieldMap}=state;
+  const extra=(window.__dashConfig&&window.__dashConfig.extraBlocks&&window.__dashConfig.extraBlocks[sectionKey])||[];
+  if(!extra.length)return'';
+  return extra.map(block=>renderDynamicBlock(block,tickets,ticketsPrev,fieldMap)).join('');
+}
+
+// ── Render all custom top-level sections ──────────────────────
+function renderCustomSections(){
+  const{tickets,ticketsPrev,fieldMap}=state;
+  const sections=(window.__dashConfig&&window.__dashConfig.customSections)||[];
+  sections.forEach(section=>{
+    const el=document.getElementById(section.id+'-content');if(!el)return;
+    const badge=document.getElementById('badge-'+section.id);
+    let tix=tickets,prev=ticketsPrev;
+    if(section.productFilter){const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];if(pid){tix=tickets.filter(t=>getFieldById(t,pid).toLowerCase()===section.productFilter.toLowerCase());prev=ticketsPrev.filter(t=>getFieldById(t,pid).toLowerCase()===section.productFilter.toLowerCase());}}
+    if(badge)badge.textContent=tix.length;
+    let html='<div class="page-header"><div><div class="page-title">'+(section.icon||'📊')+' '+esc(section.label)+'</div><div class="page-subtitle">'+esc(section.subtitle||'')+'</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+    (section.blocks||[]).forEach(block=>{html+=renderDynamicBlock(block,tix,prev,fieldMap);});
+    if(!(section.blocks&&section.blocks.length))html+='<div class="empty-state"><div class="empty-state-msg">No blocks configured — open ⚙️ Settings to add breakdown blocks to this section</div></div>';
+    el.innerHTML=html;
+  });
+}
+
 function renderAll(){
   loadConfig();
-  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();
+  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
   // Wire up collapsible block headers via event delegation (safe — no inline onclick needed)
@@ -1240,6 +1497,7 @@ function renderPool(){
       bodyHtml:breakdownTable(byD,'Damage Type',label=>(prevByD[label]||[]))
     });
   });
+  html+=renderExtraBlocks('pool');
   document.getElementById('pool-content').innerHTML=html;
 }
 
@@ -1292,6 +1550,7 @@ function renderArcade(){
     sectionBlock({title:'Quick Stats',dot:'dot-blue',bodyHtml:inlineStats(brokenTix,null,total)})+
     '</div><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Game Not Working</th><th>Status</th><th>Date</th></tr></thead><tbody>'+ticketRows+'</tbody></table></div>';
   html+=sectionBlock({title:'🎮 Broken Games <span style="font-size:.8rem;font-weight:400">'+brokenTix.length+'</span>',subtitle:'Tickets where Issue = Game Not Working',dot:'dot-amber',borderColor:'rgba(245,164,40,.3)',headerBg:'var(--amber-soft)',bodyHtml:brokenBodyHtml});
+  html+=renderExtraBlocks('arcade');
   document.getElementById('arcade-content').innerHTML=html;
 }
 
@@ -1322,6 +1581,7 @@ function renderCourier(){
   html+=sectionBlock({title:'Total Courier Issues — All Reasons <span style="font-size:.8rem;font-weight:400">'+allC.length+'</span> '+deltaChip(allC.length,allCPrev.length,true),subtitle:'Worst offender: <strong>'+esc(worst)+'</strong>',dot:'dot-blue',borderColor:'rgba(79,142,255,.25)',headerBg:'var(--blue-soft)',
     summaryItems:[{val:allC.length,label:'Total'},{val:scAllC.open,label:'Open',color:'var(--amber)'},{val:scAllC.closed,label:'Closed',color:'var(--green)'},{val:scAllC.pending,label:'Pending',color:'var(--purple)'},{val:avgAllC?avgAllC+'h':'—',label:'Avg Res.'},{val:deltaChip(allC.length,allCPrev.length,true)||'—',label:'vs Prev'}],
     bodyHtml:breakdownTable(byCAll,'Courier',label=>(prevByCAll[label]||[]))});
+  html+=renderExtraBlocks('courier');
   document.getElementById('courier-content').innerHTML=html;
 }
 
@@ -1357,6 +1617,7 @@ function renderOps(){
       summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
       bodyHtml:breakdownTable(byP,'Product',label=>(prevByP[label]||[]))});
   });
+  html+=renderExtraBlocks('ops');
   document.getElementById('ops-content').innerHTML=html;
 }
 
@@ -1414,6 +1675,7 @@ function renderRefunds(){
     '</div>'+
     '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-red"></span>All Refund Tickets</div><div class="section-block-subtitle">'+refundTix.length+' tickets · newest first</div></div></div><div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Resolution</th><th>Value</th><th>Status</th><th>Date</th></tr></thead><tbody>'+refTicketRows+'</tbody></table></div></div></div></div>'+
     '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-green"></span>All Replacement Tickets</div><div class="section-block-subtitle">'+replTix.length+' tickets · includes order numbers</div></div></div><div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Resolution</th><th>Contact Reason</th><th>Order No.</th></tr></thead><tbody>'+replTicketRows+'</tbody></table></div></div></div></div>';
+  html+=renderExtraBlocks('refunds');
   document.getElementById('refunds-content').innerHTML=html;
 }
 
@@ -1450,6 +1712,7 @@ function renderPinball(){
   const byIAll=sortedEntries(groupBy(allKelvin,t=>getFieldById(t,pfid)||getFieldById(t,rid)));
   const prevByIAll=groupBy(allKelvinPrev,t=>getFieldById(t,pfid)||getFieldById(t,rid));
   html+='<div class="section-block" style="border-color:rgba(167,139,250,.3)"><div class="section-block-header" style="background:var(--purple-soft)"><div><div class="section-block-title"><span class="color-dot dot-purple"></span>All Kelvin Products — Combined <span style="font-size:.8rem;font-weight:400">'+allKelvin.length+'</span> '+deltaChip(allKelvin.length,allKelvinPrev.length,true)+'</div><div class="section-block-subtitle">'+allKelvin.length+' total tickets · prev: '+allKelvinPrev.length+'</div></div></div><div class="section-block-body">'+inlineStats(allKelvin,allKelvinPrev,total)+breakdownTable(byIAll,'Pinball Issue / Reason',label=>(prevByIAll[label]||[]))+'</div></div>';
+  html+=renderExtraBlocks('pinball');
   document.getElementById('pinball-content').innerHTML=html;
 }
 
