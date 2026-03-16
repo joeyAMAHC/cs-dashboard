@@ -460,21 +460,21 @@ function ComparisonSection({ authFetch }) {
 
 const DASHBOARD_CSS = `
 :root {
-  --bg:#0c0e15;--bg-card:#12151f;--bg-elevated:#181c28;--bg-hover:#1e2334;
-  --border:#252b3b;--border-soft:#1c2030;--text-1:#eaf0ff;--text-2:#7d8aaa;--text-3:#404d69;
-  --blue:#4f8eff;--blue-soft:rgba(79,142,255,.12);--green:#3dd68c;--green-soft:rgba(61,214,140,.12);
-  --amber:#f5a428;--amber-soft:rgba(245,164,40,.12);--red:#ff5655;--red-soft:rgba(255,86,85,.12);
-  --purple:#a78bfa;--purple-soft:rgba(167,139,250,.12);--cyan:#22d3ee;--cyan-soft:rgba(34,211,238,.12);
+  --bg:#111827;--bg-canvas:#1a2236;--bg-card:#0d1117;--bg-elevated:#1e2640;--bg-hover:#243052;
+  --border:#2a3350;--border-soft:#1e2840;--text-1:#eaf0ff;--text-2:#7d8aaa;--text-3:#404d69;
+  --blue:#4f8eff;--blue-soft:rgba(79,142,255,.13);--green:#3dd68c;--green-soft:rgba(61,214,140,.13);
+  --amber:#f5a428;--amber-soft:rgba(245,164,40,.13);--red:#ff5655;--red-soft:rgba(255,86,85,.13);
+  --purple:#a78bfa;--purple-soft:rgba(167,139,250,.13);--cyan:#22d3ee;--cyan-soft:rgba(34,211,238,.13);
   --sidebar-w:230px;--topbar-h:56px;--radius:8px;
   --font-data:'JetBrains Mono',monospace;--font-head:'Syne',sans-serif;--font-body:'DM Sans',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{font-size:15px}
-body{background:var(--bg);color:var(--text-1);font-family:var(--font-body);line-height:1.5;overflow:hidden;height:100vh}
+body{background:var(--bg-canvas);color:var(--text-1);font-family:var(--font-body);line-height:1.5;overflow:hidden;height:100vh}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 #app{display:grid;grid-template-columns:var(--sidebar-w) 1fr;grid-template-rows:var(--topbar-h) 1fr;height:100vh}
-#topbar{grid-column:1/3;grid-row:1;display:flex;align-items:center;gap:12px;padding:0 20px 0 24px;background:var(--bg-card);border-bottom:1px solid var(--border);z-index:20}
+#topbar{grid-column:1/3;grid-row:1;display:flex;align-items:center;gap:12px;padding:0 20px 0 24px;background:var(--bg-card);border-bottom:1px solid var(--border);z-index:20;box-shadow:0 1px 0 rgba(0,0,0,.4)}
 .logo{font-family:var(--font-head);font-size:1.05rem;font-weight:800;letter-spacing:-.5px;color:var(--text-1);margin-right:4px;display:flex;align-items:center;gap:8px}
 .logo svg{color:var(--blue)}.topbar-sep{flex:1}
 .user-pill{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--text-2);padding:4px 12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:20px}
@@ -482,7 +482,7 @@ body{background:var(--bg);color:var(--text-1);font-family:var(--font-body);line-
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--radius);font-family:var(--font-body);font-size:.85rem;font-weight:500;cursor:pointer;border:none;transition:opacity .15s,transform .1s}
 .btn:active{transform:scale(.97)}.btn-primary{background:var(--blue);color:#fff}.btn-primary:hover{opacity:.85}.btn-primary:disabled{opacity:.45;cursor:not-allowed}
 .btn-ghost{background:transparent;color:var(--text-2);border:1px solid var(--border)}.btn-ghost:hover{background:var(--bg-elevated);color:var(--text-1)}
-#sidebar{grid-column:1;grid-row:2;background:var(--bg-card);border-right:1px solid var(--border);padding:12px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+#sidebar{grid-column:1;grid-row:2;background:var(--bg-card);border-right:1px solid var(--border);padding:12px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;box-shadow:1px 0 0 rgba(0,0,0,.3)}
 .nav-section-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);padding:8px 10px 4px;margin-top:6px}
 .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:6px;cursor:pointer;color:var(--text-2);font-size:.87rem;font-weight:500;transition:background .12s,color .12s;user-select:none}
 .nav-item:hover{background:var(--bg-elevated);color:var(--text-1)}.nav-item.active{background:var(--blue-soft);color:var(--blue)}
@@ -490,26 +490,37 @@ body{background:var(--bg);color:var(--text-1);font-family:var(--font-body);line-
 .nav-badge{margin-left:auto;font-family:var(--font-data);font-size:.7rem;background:var(--bg-elevated);border:1px solid var(--border);color:var(--text-2);padding:1px 6px;border-radius:10px;display:none}
 .nav-item.active .nav-badge{display:block;border-color:var(--blue);color:var(--blue);background:var(--blue-soft)}
 .sidebar-footer{margin-top:auto;padding-top:12px;border-top:1px solid var(--border)}
-#main{grid-column:2;grid-row:2;overflow-y:auto;padding:28px 32px}
+#main{grid-column:2;grid-row:2;overflow-y:auto;padding:28px 32px;background:var(--bg-canvas)}
 .section-view{display:none}.section-view.active{display:block}
-.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px}
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
 .page-title{font-family:var(--font-head);font-size:1.6rem;font-weight:800;letter-spacing:-.5px}
 .page-subtitle{color:var(--text-2);font-size:.88rem;margin-top:3px}
 .period-badge{font-family:var(--font-data);font-size:.75rem;background:var(--blue-soft);color:var(--blue);border:1px solid rgba(79,142,255,.25);padding:4px 10px;border-radius:20px;white-space:nowrap}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
-.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 .stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
 .stat-card.blue::before{background:var(--blue)}.stat-card.green::before{background:var(--green)}.stat-card.amber::before{background:var(--amber)}.stat-card.red::before{background:var(--red)}.stat-card.purple::before{background:var(--purple)}.stat-card.cyan::before{background:var(--cyan)}
 .stat-label{font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);margin-bottom:8px}
 .stat-value{font-family:var(--font-data);font-size:1.9rem;font-weight:600;line-height:1;color:var(--text-1)}
 .stat-value.blue{color:var(--blue)}.stat-value.green{color:var(--green)}.stat-value.amber{color:var(--amber)}.stat-value.red{color:var(--red)}.stat-value.purple{color:var(--purple)}.stat-value.cyan{color:var(--cyan)}
 .stat-sub{font-size:.78rem;color:var(--text-2);margin-top:5px}
-.section-block{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:20px;overflow:hidden}
-.section-block-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.section-block{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.section-block-header{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;transition:background .12s}
+.section-block-header:hover{background:var(--bg-elevated)}
+.section-block-header.collapsed{border-bottom:none}
 .section-block-title{font-family:var(--font-head);font-size:1rem;font-weight:700;display:flex;align-items:center;gap:10px}
 .section-block-title .color-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .section-block-subtitle{font-size:.78rem;color:var(--text-2);margin-top:2px}
 .section-block-body{padding:16px 18px}
+.section-block-body.collapsed{display:none}
+.collapse-chevron{color:var(--text-3);font-size:.75rem;transition:transform .2s;flex-shrink:0;margin-left:8px}
+.collapse-chevron.open{transform:rotate(180deg)}
+/* Summary bar */
+.summary-bar{display:flex;align-items:center;gap:0;background:var(--bg-elevated);border-radius:6px;margin-bottom:16px;overflow:hidden;border:1px solid var(--border)}
+.summary-bar-item{flex:1;padding:10px 14px;border-right:1px solid var(--border);text-align:center}
+.summary-bar-item:last-child{border-right:none}
+.summary-bar-val{font-family:var(--font-data);font-size:1.1rem;font-weight:700;color:var(--text-1);display:flex;align-items:center;justify-content:center;gap:4px}
+.summary-bar-lbl{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-3);margin-top:2px}
 .data-table-wrap{overflow-x:auto}
 table.data-table{width:100%;border-collapse:collapse;font-size:.84rem}
 table.data-table th{text-align:left;padding:8px 12px;background:var(--bg-elevated);color:var(--text-2);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);white-space:nowrap}
@@ -524,12 +535,12 @@ table.data-table .total-row td{font-weight:700;color:var(--blue);background:var(
 .bar-row-label{width:180px;font-size:.82rem;color:var(--text-1);flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-track{flex:1;background:var(--bg-elevated);border-radius:3px;height:8px;overflow:hidden}
 .bar-fill{height:100%;border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)}
-.bar-row-val{font-family:var(--font-data);font-size:.8rem;color:var(--text-2);width:32px;text-align:right;flex-shrink:0}
+.bar-row-val{font-family:var(--font-data);font-size:.8rem;color:var(--text-2);min-width:60px;text-align:right;flex-shrink:0}
 .inline-stats{display:flex;gap:20px;padding:12px 0 16px;flex-wrap:wrap}
 .inline-stat{display:flex;flex-direction:column;gap:2px}
 .inline-stat-val{font-family:var(--font-data);font-size:1.35rem;font-weight:600;color:var(--text-1)}
 .inline-stat-lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2)}
-#loading-overlay{position:fixed;inset:0;background:rgba(12,14,21,.92);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:20px}
+#loading-overlay{position:fixed;inset:0;background:rgba(10,12,18,.92);z-index:100;display:none;align-items:center;justify-content:center;flex-direction:column;gap:20px}
 #loading-overlay.visible{display:flex}
 .loading-box{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:30px 36px;min-width:380px;max-width:480px}
 .loading-title{font-family:var(--font-head);font-size:1.1rem;font-weight:800;margin-bottom:18px;display:flex;align-items:center;gap:10px}
@@ -575,7 +586,47 @@ const OPS_REASONS=['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking N
 const REFUND_VALUES=['Refund','Partial Refund'];
 const REPLACEMENT_VALUES=['Free Product Upgrade','Free Gift','Replacement Sent'];
 
-// ── Delta chip helper ────────────────────────────────────────
+// ── Collapsible blocks ───────────────────────────────────────
+const collapseState={};
+function toggleBlock(id){
+  const body=document.getElementById('block-body-'+id);
+  const hdr=document.getElementById('block-hdr-'+id);
+  const chev=document.getElementById('block-chev-'+id);
+  if(!body)return;
+  const isCollapsed=body.classList.toggle('collapsed');
+  if(hdr)hdr.classList.toggle('collapsed',isCollapsed);
+  if(chev)chev.classList.toggle('open',!isCollapsed);
+  collapseState[id]=isCollapsed;
+}
+// Wrap a block with collapsible header — call after rendering
+function makeCollapsible(id){
+  const body=document.getElementById('block-body-'+id);
+  const hdr=document.getElementById('block-hdr-'+id);
+  const chev=document.getElementById('block-chev-'+id);
+  if(!body||!hdr)return;
+  if(collapseState[id]){body.classList.add('collapsed');hdr.classList.add('collapsed');if(chev)chev.classList.remove('open');}
+  else{body.classList.remove('collapsed');hdr.classList.remove('collapsed');if(chev)chev.classList.add('open');}
+}
+
+// ── Section block HTML builder ───────────────────────────────
+let _blockId=0;
+function sectionBlock({title,subtitle,dot,headerBg,borderColor,bodyHtml,summaryItems}){
+  const id='blk'+(++_blockId);
+  const dotHtml=dot?'<span class="color-dot '+dot+'"></span>':'';
+  const sumBar=summaryItems&&summaryItems.length?
+    '<div class="summary-bar">'+summaryItems.map(({val,label,color})=>
+      '<div class="summary-bar-item"><div class="summary-bar-val"'+(color?' style="color:'+color+'"':'')+'>'+(val||'—')+'</div><div class="summary-bar-lbl">'+label+'</div></div>'
+    ).join('')+'</div>':'';
+  return'<div class="section-block"'+(borderColor?' style="border-color:'+borderColor+'"':'')+'>'+ 
+    '<div class="section-block-header'+(collapseState[id]?' collapsed':'')+'" id="block-hdr-'+id+'" onclick="toggleBlock(\''+id+'\')"'+(headerBg?' style="background:'+headerBg+'"':'')+'>'+ 
+      '<div><div class="section-block-title">'+dotHtml+title+'</div>'+(subtitle?'<div class="section-block-subtitle">'+subtitle+'</div>':'')+'</div>'+
+      '<span class="collapse-chevron'+(collapseState[id]?'':' open')+'" id="block-chev-'+id+'">▾</span>'+
+    '</div>'+
+    '<div class="section-block-body'+(collapseState[id]?' collapsed':'')+'" id="block-body-'+id+'">'+
+      sumBar+bodyHtml+
+    '</div>'+
+  '</div>';
+}
 function deltaChip(curr,prev,goodWhenDown=true){
   if(prev===undefined||prev===null)return'';
   if(prev===0&&curr===0)return'';
@@ -793,9 +844,24 @@ function renderPool(){
   ];
   let html='<div class="page-header"><div><div class="page-title accent-blue">🎱 Pool Tables</div><div class="page-subtitle">CSLT Pool Tables — Supplier &amp; Courier damage breakdown</div></div><div class="period-badge" id="pb-pool">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   sections.forEach(({title,dot,tickets:tix,prev})=>{
+    const sc=statusCounts(tix);
+    const avg=avgResHours(tix);
     const byD=sortedEntries(groupBy(tix,t=>getFieldById(t,did)));
     const prevByD=groupBy(prev,t=>getFieldById(t,did));
-    html+='<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot '+dot+'"></span>'+esc(title)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true)+'</div><div class="section-block-subtitle">'+tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all</div></div></div><div class="section-block-body">'+inlineStats(tix,prev,total)+breakdownTable(byD,'Damage Type',label=>(prevByD[label]||[]))+'</div></div>';
+    html+=sectionBlock({
+      title:esc(title)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),
+      subtitle:tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all',
+      dot,
+      summaryItems:[
+        {val:tix.length,label:'Total',color:'var(--text-1)'},
+        {val:sc.open,label:'Open',color:'var(--amber)'},
+        {val:sc.closed,label:'Closed',color:'var(--green)'},
+        {val:sc.pending,label:'Pending',color:'var(--purple)'},
+        {val:avg?avg+'h':'—',label:'Avg Res.'},
+        {val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'},
+      ],
+      bodyHtml:breakdownTable(byD,'Damage Type',label=>(prevByD[label]||[]))
+    });
   });
   document.getElementById('pool-content').innerHTML=html;
 }
@@ -819,13 +885,19 @@ function renderArcade(){
   document.getElementById('badge-arcade').textContent=allArcade.length;
   let html='<div class="page-header"><div><div class="page-title accent-green">🕹 Gao Arcades</div><div class="page-subtitle">Upright Arcade · Cocktail Pro · Cocktail MKII — Item Not Working</div></div><div class="period-badge" id="pb-arcade">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   sets.forEach(({product,tickets:tix,prev,dot})=>{
+    const sc=statusCounts(tix);const avg=avgResHours(tix);
     const byI=sortedEntries(groupBy(tix,t=>getFieldById(t,aid)));
     const prevByI=groupBy(prev,t=>getFieldById(t,aid));
-    html+='<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot '+dot+'"></span>'+esc(product)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true)+'</div><div class="section-block-subtitle">'+tix.length+' tickets · prev: '+prev.length+' · Contact Reason: '+ARCADE_REASON+'</div></div></div><div class="section-block-body">'+inlineStats(tix,prev,total)+breakdownTable(byI,'Issue / Damage Type',label=>(prevByI[label]||[]))+'</div></div>';
+    html+=sectionBlock({title:esc(product)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length+' · Contact Reason: '+ARCADE_REASON,dot,
+      summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
+      bodyHtml:breakdownTable(byI,'Issue / Damage Type',label=>(prevByI[label]||[]))});
   });
+  const scAll2=statusCounts(allArcade);const avgAll=avgResHours(allArcade);
   const byIA=sortedEntries(groupBy(allArcade,t=>getFieldById(t,aid)));
   const prevByIA=groupBy(allArcadePrev,t=>getFieldById(t,aid));
-  html+='<div class="section-block" style="border-color:rgba(255,86,85,.3)"><div class="section-block-header" style="background:var(--red-soft)"><div><div class="section-block-title"><span class="color-dot dot-red"></span>All Arcade Machines — Combined <span style="font-size:.8rem;font-weight:400">'+allArcade.length+'</span> '+deltaChip(allArcade.length,allArcadePrev.length,true)+'</div></div></div><div class="section-block-body">'+inlineStats(allArcade,allArcadePrev,total)+breakdownTable(byIA,'Issue / Damage Type',label=>(prevByIA[label]||[]))+'</div></div>';
+  html+=sectionBlock({title:'All Arcade Machines — Combined <span style="font-size:.8rem;font-weight:400">'+allArcade.length+'</span> '+deltaChip(allArcade.length,allArcadePrev.length,true),dot:'dot-red',borderColor:'rgba(255,86,85,.3)',headerBg:'var(--red-soft)',
+    summaryItems:[{val:allArcade.length,label:'Total'},{val:scAll2.open,label:'Open',color:'var(--amber)'},{val:scAll2.closed,label:'Closed',color:'var(--green)'},{val:scAll2.pending,label:'Pending',color:'var(--purple)'},{val:avgAll?avgAll+'h':'—',label:'Avg Res.'},{val:deltaChip(allArcade.length,allArcadePrev.length,true)||'—',label:'vs Prev'}],
+    bodyHtml:breakdownTable(byIA,'Issue / Damage Type',label=>(prevByIA[label]||[]))});
   // ── Broken Games section ─────────────────────────────────
   const bgid=fieldMap[FIELD_NAMES.BROKEN_GAMES.toLowerCase()];
   const brokenTix=tickets.filter(t=>getFieldById(t,aid).toLowerCase()==='game not working');
@@ -838,10 +910,11 @@ function renderArcade(){
     const sc=t.status==='closed'?'tag-closed':t.status==='pending'?'tag-pending':'tag-open';
     return'<tr><td style="font-family:var(--font-data);font-size:.75rem;color:var(--blue)">'+esc(String(t.id))+'</td><td>'+esc((t.customer?.name)||'Unknown')+'</td><td>'+esc(prod)+'</td><td style="font-weight:600;color:var(--amber)">'+esc(game)+'</td><td><span class="tag '+sc+'">'+esc(t.status)+'</span></td><td style="color:var(--text-2)">'+date+'</td></tr>';
   }).join('');
-  html+='<div class="section-block" style="border-color:rgba(245,164,40,.3);margin-top:8px"><div class="section-block-header" style="background:var(--amber-soft)"><div><div class="section-block-title"><span class="color-dot dot-amber"></span>🎮 Broken Games <span style="font-size:.8rem;font-weight:400">'+brokenTix.length+'</span></div><div class="section-block-subtitle">Tickets where Issue = Game Not Working — game breakdown</div></div></div><div class="section-block-body">'+
-    '<div class="blocks-2col" style="margin-bottom:16px"><div class="section-block" style="margin-bottom:0"><div class="section-block-header"><div><div class="section-block-title" style="font-size:.88rem"><span class="color-dot dot-amber"></span>By Game</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Game</th><th>Reports</th></tr></thead><tbody>'+summaryRows+'</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+brokenTix.length+'</td></tr></tfoot></table></div></div></div>'+
-    '<div class="section-block" style="margin-bottom:0"><div class="section-block-header"><div><div class="section-block-title" style="font-size:.88rem"><span class="color-dot dot-blue"></span>Quick Stats</div></div></div><div class="section-block-body">'+inlineStats(brokenTix,null,total)+'</div></div></div>'+
-    '<div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Game Not Working</th><th>Status</th><th>Date</th></tr></thead><tbody>'+ticketRows+'</tbody></table></div></div></div>';
+  const brokenBodyHtml='<div class="blocks-2col" style="margin-bottom:16px">'+
+    sectionBlock({title:'By Game',dot:'dot-amber',bodyHtml:'<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Game</th><th>Reports</th></tr></thead><tbody>'+summaryRows+'</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+brokenTix.length+'</td></tr></tfoot></table></div>'})+
+    sectionBlock({title:'Quick Stats',dot:'dot-blue',bodyHtml:inlineStats(brokenTix,null,total)})+
+    '</div><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Game Not Working</th><th>Status</th><th>Date</th></tr></thead><tbody>'+ticketRows+'</tbody></table></div>';
+  html+=sectionBlock({title:'🎮 Broken Games <span style="font-size:.8rem;font-weight:400">'+brokenTix.length+'</span>',subtitle:'Tickets where Issue = Game Not Working',dot:'dot-amber',borderColor:'rgba(245,164,40,.3)',headerBg:'var(--amber-soft)',bodyHtml:brokenBodyHtml});
   document.getElementById('arcade-content').innerHTML=html;
 }
 
@@ -858,14 +931,20 @@ function renderCourier(){
   COURIER_REASONS.forEach((reason,i)=>{
     const tix=tickets.filter(t=>getFieldById(t,rid).toLowerCase()===reason.toLowerCase());
     const prev=ticketsPrev.filter(t=>getFieldById(t,rid).toLowerCase()===reason.toLowerCase());
+    const sc=statusCounts(tix);const avg=avgResHours(tix);
     const byC=sortedEntries(groupBy(tix,t=>getFieldById(t,cid)));
     const prevByC=groupBy(prev,t=>getFieldById(t,cid));
-    html+='<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot '+dots[i]+'"></span>'+esc(reason)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true)+'</div><div class="section-block-subtitle">'+tix.length+' tickets · prev: '+prev.length+'</div></div></div><div class="section-block-body">'+inlineStats(tix,prev,total)+breakdownTable(byC,'Courier',label=>(prevByC[label]||[]))+'</div></div>';
+    html+=sectionBlock({title:esc(reason)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length,dot:dots[i],
+      summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
+      bodyHtml:breakdownTable(byC,'Courier',label=>(prevByC[label]||[]))});
   });
+  const scAllC=statusCounts(allC);const avgAllC=avgResHours(allC);
   const byCAll=sortedEntries(groupBy(allC,t=>getFieldById(t,cid)));
   const prevByCAll=groupBy(allCPrev,t=>getFieldById(t,cid));
   const worst=byCAll[0]?.[0]||'—';
-  html+='<div class="section-block" style="border-color:rgba(79,142,255,.25)"><div class="section-block-header" style="background:var(--blue-soft)"><div><div class="section-block-title"><span class="color-dot dot-blue"></span>Total Courier Issues — All Reasons <span style="font-size:.8rem;font-weight:400">'+allC.length+'</span> '+deltaChip(allC.length,allCPrev.length,true)+'</div><div class="section-block-subtitle">Worst offender: <strong>'+esc(worst)+'</strong></div></div></div><div class="section-block-body">'+inlineStats(allC,allCPrev,total)+breakdownTable(byCAll,'Courier',label=>(prevByCAll[label]||[]))+'</div></div>';
+  html+=sectionBlock({title:'Total Courier Issues — All Reasons <span style="font-size:.8rem;font-weight:400">'+allC.length+'</span> '+deltaChip(allC.length,allCPrev.length,true),subtitle:'Worst offender: <strong>'+esc(worst)+'</strong>',dot:'dot-blue',borderColor:'rgba(79,142,255,.25)',headerBg:'var(--blue-soft)',
+    summaryItems:[{val:allC.length,label:'Total'},{val:scAllC.open,label:'Open',color:'var(--amber)'},{val:scAllC.closed,label:'Closed',color:'var(--green)'},{val:scAllC.pending,label:'Pending',color:'var(--purple)'},{val:avgAllC?avgAllC+'h':'—',label:'Avg Res.'},{val:deltaChip(allC.length,allCPrev.length,true)||'—',label:'vs Prev'}],
+    bodyHtml:breakdownTable(byCAll,'Courier',label=>(prevByCAll[label]||[]))});
   document.getElementById('courier-content').innerHTML=html;
 }
 
@@ -888,13 +967,18 @@ function renderOps(){
     scAll.open+=sc.open;scAll.closed+=sc.closed;scAll.pending+=sc.pending;
     return'<tr><td style="max-width:300px;white-space:normal">'+esc(reason)+'</td><td style="font-weight:600">'+tix.length+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+prev.length+'</td><td style="text-align:right">'+deltaChip(tix.length,prev.length,true)+'</td><td><span class="tag tag-open">'+sc.open+'</span></td><td><span class="tag tag-closed">'+sc.closed+'</span></td><td><span class="tag tag-pending">'+sc.pending+'</span></td></tr>';
   }).join('');
-  let html='<div class="page-header"><div><div class="page-title accent-red">⚙️ Ops Issues</div><div class="page-subtitle">Picking errors · Tracking · Delays · Wrong address · Misorder</div></div><div class="period-badge" id="pb-ops">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>'+
-    '<div class="section-block" style="margin-bottom:24px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-red"></span>Ops Summary — All Reasons <span style="font-size:.8rem;font-weight:400">'+opsTotal+'</span> '+deltaChip(opsTotal,opsPrevTotal,true)+'</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Contact Reason</th><th>Total</th><th style="color:var(--text-3)">Prev</th><th>Δ</th><th>Open</th><th>Closed</th><th>Pending</th></tr></thead><tbody>'+summaryRows+'</tbody><tfoot><tr class="total-row"><td>TOTAL</td><td>'+opsTotal+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+opsPrevTotal+'</td><td style="text-align:right">'+deltaChip(opsTotal,opsPrevTotal,true)+'</td><td><span class="tag tag-open">'+scAll.open+'</span></td><td><span class="tag tag-closed">'+scAll.closed+'</span></td><td><span class="tag tag-pending">'+scAll.pending+'</span></td></tr></tfoot></table></div></div></div>';
+  let html='<div class="page-header"><div><div class="page-title accent-red">⚙️ Ops Issues</div><div class="page-subtitle">Picking errors · Tracking · Delays · Wrong address · Misorder</div></div><div class="period-badge" id="pb-ops">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  html+=sectionBlock({title:'Ops Summary — All Reasons <span style="font-size:.8rem;font-weight:400">'+opsTotal+'</span> '+deltaChip(opsTotal,opsPrevTotal,true),dot:'dot-red',
+    summaryItems:[{val:opsTotal,label:'Total',color:'var(--red)'},{val:scAll.open,label:'Open',color:'var(--amber)'},{val:scAll.closed,label:'Closed',color:'var(--green)'},{val:scAll.pending,label:'Pending',color:'var(--purple)'},{val:deltaChip(opsTotal,opsPrevTotal,true)||'—',label:'vs Prev'}],
+    bodyHtml:'<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Contact Reason</th><th>Total</th><th style="color:var(--text-3)">Prev</th><th>Δ</th><th>Open</th><th>Closed</th><th>Pending</th></tr></thead><tbody>'+summaryRows+'</tbody><tfoot><tr class="total-row"><td>TOTAL</td><td>'+opsTotal+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+opsPrevTotal+'</td><td style="text-align:right">'+deltaChip(opsTotal,opsPrevTotal,true)+'</td><td><span class="tag tag-open">'+scAll.open+'</span></td><td><span class="tag tag-closed">'+scAll.closed+'</span></td><td><span class="tag tag-pending">'+scAll.pending+'</span></td></tr></tfoot></table></div>'});
   const dots=['dot-red','dot-amber','dot-blue','dot-purple','dot-cyan'];
   opsGroups.forEach(({reason,tickets:tix,prev},i)=>{
+    const sc=statusCounts(tix);const avg=avgResHours(tix);
     const byP=sortedEntries(groupBy(tix,t=>getFieldById(t,pid)));
     const prevByP=groupBy(prev,t=>getFieldById(t,pid));
-    html+='<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot '+dots[i]+'"></span>'+esc(reason)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true)+'</div><div class="section-block-subtitle">'+tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all</div></div></div><div class="section-block-body">'+inlineStats(tix,prev,total)+breakdownTable(byP,'Product',label=>(prevByP[label]||[]))+'</div></div>';
+    html+=sectionBlock({title:esc(reason)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all',dot:dots[i],
+      summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
+      bodyHtml:breakdownTable(byP,'Product',label=>(prevByP[label]||[]))});
   });
   document.getElementById('ops-content').innerHTML=html;
 }
