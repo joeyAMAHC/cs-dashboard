@@ -533,13 +533,17 @@ function BlockEditor({ block: init, gorgiasFields, ticketValues, iStyle, onSave,
   const [b, setB] = useState(init)
   const fLabels = gorgiasFields.map(f => f.label)
   const filterValsAvail = b.filterField ? (ticketValues[(b.filterField||'').toLowerCase()] || []) : []
+  const groupValsAvail  = b.groupField  ? (ticketValues[(b.groupField||'').toLowerCase()]  || []) : []
   function updB(k, v) { setB(p => ({...p, [k]: v})) }
   const lbl = { fontSize:'.72rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'.06em', color:'var(--text-2)', marginBottom:5, marginTop:10 }
+  const secHd = { fontFamily:'var(--font-head)', fontWeight:700, fontSize:'.82rem', color:'var(--text-2)', marginTop:14, marginBottom:2, paddingTop:12, borderTop:'1px solid var(--border-soft)' }
   const FieldSelect = ({ val, onChange, placeholder }) => fLabels.length > 0
     ? <select value={val||''} onChange={e=>onChange(e.target.value)} style={{...iStyle,cursor:'pointer'}}><option value="">-- none --</option>{fLabels.map(l=><option key={l} value={l}>{l}</option>)}{val&&!fLabels.includes(val)&&<option value={val}>{val} (current)</option>}</select>
     : <input value={val||''} onChange={e=>onChange(e.target.value)} placeholder={placeholder} style={iStyle} />
   return (
     <div style={{ background:'var(--bg-canvas)', border:'1px solid rgba(79,142,255,.3)', borderRadius:8, padding:16, marginTop:8 }}>
+
+      {/* Title + colour */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
         <div><div style={lbl}>Block Title *</div><input value={b.title||''} onChange={e=>updB('title',e.target.value)} placeholder="e.g. Warranty Claims" style={iStyle} /></div>
         <div><div style={lbl}>Dot Colour</div>
@@ -548,35 +552,45 @@ function BlockEditor({ block: init, gorgiasFields, ticketValues, iStyle, onSave,
           </select>
         </div>
       </div>
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:4 }}>
+
+      {/* ── Filter section ── */}
+      <div style={secHd}>Filter</div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr', gap:12 }}>
         <div><div style={lbl}>Filter by Field</div><FieldSelect val={b.filterField} onChange={v=>updB('filterField',v)} placeholder="e.g. Contact Reason" /></div>
-        <div><div style={lbl}>Break Down / Group By</div><FieldSelect val={b.groupField} onChange={v=>updB('groupField',v)} placeholder="e.g. Pool Table Damage" /></div>
       </div>
       {b.filterField && (
         <div style={{ marginTop:8 }}>
-          <div style={lbl}>Filter Values (show tickets matching any of these)</div>
-          <LEditor values={b.filterValues||[]} available={filterValsAvail} onChange={v=>updB('filterValues',v)} iStyle={iStyle} ph="e.g. Warranty Claim" />
+          <div style={lbl}>Filter Values — navigate the tree and add the values to match</div>
+          <LEditor values={b.filterValues||[]} available={filterValsAvail} onChange={v=>updB('filterValues',v)} iStyle={iStyle} ph="e.g. WISMO" />
         </div>
       )}
+
+      {/* ── Group By section ── */}
+      <div style={secHd}>Breakdown / Group By</div>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+        <div><div style={lbl}>Group By Field</div><FieldSelect val={b.groupField} onChange={v=>updB('groupField',v)} placeholder="e.g. Contact Reason" /></div>
+        <div><div style={lbl}>Column Header</div><input value={b.groupLabel||''} onChange={e=>updB('groupLabel',e.target.value)} placeholder={b.groupField||'Value'} style={iStyle} /></div>
+      </div>
       {b.groupField && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:8 }}>
-          <div>
-            <div style={lbl}>Breakdown Column Header</div>
-            <input value={b.groupLabel||''} onChange={e=>updB('groupLabel',e.target.value)} placeholder={b.groupField||'Value'} style={iStyle} />
-          </div>
-          <div>
-            <div style={lbl}>Breakdown Depth</div>
-            <select value={b.groupDepth||'full'} onChange={e=>updB('groupDepth',e.target.value)} style={{...iStyle,cursor:'pointer'}}>
-              <option value="full">Full path (e.g. WISMO::Item Delayed::Ops fault)</option>
-              <option value="1">Level 1 only (e.g. WISMO)</option>
-              <option value="2">Level 2 only (e.g. WISMO::Item Delayed)</option>
-              <option value="3">Level 3 only (e.g. WISMO::Item Delayed::Ops fault)</option>
-              <option value="last">Last segment only (e.g. Ops fault)</option>
-            </select>
-          </div>
+        <div style={{ marginTop:8 }}>
+          <div style={lbl}>Group By Values — pick specific rows to show (leave empty to show all)</div>
+          <LEditor values={b.groupValues||[]} available={groupValsAvail} onChange={v=>updB('groupValues',v)} iStyle={iStyle} ph="Leave empty to show all values" />
         </div>
       )}
-      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:14 }}>
+      {b.groupField && !(b.groupValues||[]).length && (
+        <div style={{ marginTop:8 }}>
+          <div style={lbl}>Depth (when showing all values)</div>
+          <select value={b.groupDepth||'full'} onChange={e=>updB('groupDepth',e.target.value)} style={{...iStyle,cursor:'pointer'}}>
+            <option value="full">Full path</option>
+            <option value="1">Level 1 only</option>
+            <option value="2">Level 2 only</option>
+            <option value="3">Level 3 only</option>
+            <option value="last">Last segment only</option>
+          </select>
+        </div>
+      )}
+
+      <div style={{ display:'flex', gap:8, justifyContent:'flex-end', marginTop:16 }}>
         <button onClick={onCancel} style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-2)', borderRadius:6, padding:'7px 14px', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:'.84rem' }}>Cancel</button>
         <button onClick={()=>b.title&&onSave(b)} disabled={!b.title} style={{ background:b.title?'var(--blue)':'var(--bg-elevated)', color:b.title?'#fff':'var(--text-3)', border:'none', borderRadius:6, padding:'7px 16px', cursor:b.title?'pointer':'default', fontFamily:'var(--font-body)', fontWeight:600, fontSize:'.84rem' }}>Save Block</button>
       </div>
@@ -1424,7 +1438,7 @@ function renderDynamicBlock(block,tickets,ticketsPrev,fieldMap){
     if(fid){tix=tickets.filter(t=>block.filterValues.some(v=>matchesValue(getFieldById(t,fid),v)));prev=ticketsPrev.filter(t=>block.filterValues.some(v=>matchesValue(getFieldById(t,fid),v)));}
   }
   const gfid=block.groupField?fieldMap[block.groupField.toLowerCase()]:null;
-  // Apply depth truncation to group-by keys
+  // Depth truncation helper (used when no explicit groupValues)
   function groupKey(t){
     const raw=getFieldById(t,gfid);
     const d=block.groupDepth;
@@ -1434,8 +1448,15 @@ function renderDynamicBlock(block,tickets,ticketsPrev,fieldMap){
     const n=parseInt(d);return parts.slice(0,n).join('::');
   }
   const sc=statusCounts(tix);const avg=avgResHours(tix);
-  const byGroup=gfid?sortedEntries(groupBy(tix,t=>groupKey(t))):[];
-  const prevByGroup=gfid?groupBy(prev,t=>groupKey(t)):{};
+  // If explicit groupValues set, use them as rows with prefix matching
+  let byGroup,prevByGroup;
+  if(gfid&&block.groupValues&&block.groupValues.length){
+    byGroup=block.groupValues.map(gv=>[gv,tix.filter(t=>matchesValue(getFieldById(t,gfid),gv))]).filter(([,r])=>r.length>0);
+    prevByGroup={};block.groupValues.forEach(gv=>{prevByGroup[gv]=prev.filter(t=>matchesValue(getFieldById(t,gfid),gv));});
+  }else{
+    byGroup=gfid?sortedEntries(groupBy(tix,t=>groupKey(t))):[];
+    prevByGroup=gfid?groupBy(prev,t=>groupKey(t)):{};
+  }
   const bodyHtml=(gfid&&byGroup.length)?breakdownTable(byGroup,esc(block.groupLabel||block.groupField||'Value'),label=>(prevByGroup[label]||[])):inlineStats(tix,prev,state.tickets.length);
   return sectionBlock({title:esc(block.title)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length,dot:block.dot||'dot-blue',summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],bodyHtml:bodyHtml});
 }
