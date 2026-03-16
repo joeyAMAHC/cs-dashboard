@@ -61,9 +61,12 @@ export default function Dashboard() {
 function DashboardApp({ user, onSignOut, authFetch }) {
   useEffect(() => {
     window.__authFetch = authFetch
+    // Remove any existing script first
+    const existing = document.getElementById('__dashboard_logic')
+    if (existing) existing.remove()
     const script = document.createElement('script')
     script.id = '__dashboard_logic'
-    script.text = DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;'
+    script.innerHTML = DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;'
     document.body.appendChild(script)
     return () => {
       delete window.__authFetch
