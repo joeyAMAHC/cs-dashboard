@@ -40,6 +40,18 @@ Go to **Google Cloud Console → APIs & Services → Credentials → your OAuth 
 
 ---
 
+## Roadmap / Next Features
+
+### 📋 Supplier Evidence Reports (next priority)
+Export a formatted PDF/Word report for a selected date range that includes:
+- Order number + order details (product, customer, date)
+- Photos attached to the ticket (photo evidence of the defect/issue)
+- Ticket description and resolution notes
+- Grouped by supplier so the report can be handed directly to the supplier as a formal evidence package
+- Goal: give suppliers clear, documented proof of recurring product issues to hold them accountable
+
+---
+
 ## Controlling who can log in
 
 In **Supabase → Authentication → Settings** you can:
