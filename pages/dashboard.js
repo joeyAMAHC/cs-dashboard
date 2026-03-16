@@ -136,7 +136,14 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
             <option value="90">Last 90 days</option>
           </select>
           <span id="comp-label" style={{ fontSize: '.75rem', color: 'var(--text-3)', whiteSpace: 'nowrap' }} />
-          <button className="btn btn-primary" id="run-btn" onClick={() => window.__runReport()}>
+          <button className="btn btn-primary" id="run-btn" onClick={() => {
+            if (typeof window.__runReport !== 'function') {
+              const b = document.getElementById('error-banner')
+              if (b) { b.textContent = 'Error: dashboard script failed to initialise — try refreshing the page'; b.classList.add('visible') }
+              return
+            }
+            window.__runReport()
+          }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Run Report
           </button>
@@ -210,7 +217,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
               <div className="welcome-logo">📊</div>
               <div className="welcome-title">Gorgias CS Dashboard</div>
               <div className="welcome-sub">Pull your customer service data from Gorgias and get instant reporting across all product lines, courier issues, ops faults, and refunds.</div>
-              <button className="btn btn-primary" style={{ padding: '10px 24px', fontSize: '.95rem' }} onClick={() => window.__runReport()}>
+              <button className="btn btn-primary" style={{ padding: '10px 24px', fontSize: '.95rem' }} onClick={() => typeof window.__runReport === 'function' ? window.__runReport() : alert('Dashboard not ready — try refreshing')}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                 Run Report
               </button>
@@ -1306,7 +1313,7 @@ table.data-table .total-row td{font-weight:700;color:var(--blue);background:var(
 .welcome-logo{font-size:3rem;margin-bottom:8px}
 .welcome-title{font-family:var(--font-head);font-size:2rem;font-weight:800}
 .welcome-sub{color:var(--text-2);max-width:380px;line-height:1.6}
-.error-banner{background:var(--red-soft);border:1px solid rgba(255,86,85,.3);color:var(--red);border-radius:var(--radius);padding:12px 16px;font-size:.88rem;display:none}
+.error-banner{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#2a0a0a;border:1px solid var(--red);color:#ff6b6b;border-radius:8px;padding:14px 20px;font-size:.88rem;display:none;z-index:999;box-shadow:0 4px 24px rgba(0,0,0,.6);max-width:600px;white-space:nowrap}
 .error-banner.visible{display:block}
 .blocks-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .val-chip{font-family:var(--font-data);font-size:.78rem;background:var(--green-soft);color:var(--green);padding:2px 7px;border-radius:4px}
@@ -1519,7 +1526,15 @@ async function runReport(){
       const el=document.getElementById('last-run-time');
       if(el)el.textContent='Updated '+new Date().toLocaleTimeString()+' · next refresh in '+m+'m '+String(s).padStart(2,'0')+'s';
     },1000);
-  }catch(e){showLoading(false);errBanner.textContent='Error: '+e.message;errBanner.classList.add('visible');console.error(e);}
+  }catch(e){
+    console.error('runReport error:',e);
+    addLog('✗ Error: '+e.message,'err');
+    barEl.style.background='var(--red)';
+    errBanner.textContent='Report failed: '+e.message;
+    errBanner.classList.add('visible');
+    // Keep overlay open for 4s so user can read the error
+    setTimeout(()=>showLoading(false),4000);
+  }
   btn.disabled=false;
 }
 
