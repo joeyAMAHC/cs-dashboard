@@ -59,20 +59,30 @@ export default function Dashboard() {
 
 // ── The full dashboard UI ────────────────────────────────────
 function DashboardApp({ user, onSignOut, authFetch }) {
+  const [showSettings, setShowSettings] = useState(false)
+
   useEffect(() => {
+    // Load any saved config into window before injecting the script
+    try {
+      const saved = localStorage.getItem('__dashConfig')
+      if (saved) window.__dashConfig = JSON.parse(saved)
+    } catch(e) {}
+
     window.__authFetch = authFetch
     // Remove any existing script first
     const existing = document.getElementById('__dashboard_logic')
     if (existing) existing.remove()
     const script = document.createElement('script')
     script.id = '__dashboard_logic'
-    script.appendChild(document.createTextNode(DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;'))
+    script.appendChild(document.createTextNode(DASHBOARD_LOGIC + '\nwindow.__runReport = runReport;\nwindow.__showSection = showSection;\nwindow.toggleBlock = toggleBlock;\nwindow.__renderAll = renderAll;'))
     document.body.appendChild(script)
     return () => {
       delete window.__authFetch
       delete window.__runReport
       delete window.__showSection
       delete window.toggleBlock
+      delete window.__renderAll
+      delete window.__state
       const el = document.getElementById('__dashboard_logic')
       if (el) el.remove()
     }
@@ -101,6 +111,7 @@ function DashboardApp({ user, onSignOut, authFetch }) {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
             Run Report
           </button>
+          <button className="btn btn-ghost" onClick={() => setShowSettings(true)} style={{ padding: '6px 12px', fontSize: '1rem', lineHeight: 1 }} title="Dashboard Settings">⚙️</button>
           <div className="user-pill">
             <span>{user?.email}</span>
             <button className="btn btn-ghost" style={{ padding: '5px 10px', fontSize: '.8rem' }} onClick={onSignOut}>Sign out</button>
@@ -172,8 +183,363 @@ function DashboardApp({ user, onSignOut, authFetch }) {
           <div id="loading-log" />
         </div>
       </div>
+
+      {showSettings && (
+        <SettingsPanel
+          onClose={() => setShowSettings(false)}
+          authFetch={authFetch}
+          onApply={() => {
+            if (window.__renderAll && window.__state && window.__state.hasData) window.__renderAll()
+          }}
+        />
+      )}
     </>
   )
+}
+
+// ── Settings Panel ────────────────────────────────────────────
+const DEFAULT_DASH_CONFIG = {
+  fieldNames: {
+    PRODUCT: 'Product', REASON: 'Contact Reason', DAMAGE: 'Pool Table Damage',
+    ARCADE_ISSUE: 'Arcade Machine Issue/Damage', PINBALL_ISSUE: 'Pinball Issue',
+    BROKEN_GAMES: 'Broken Games', COURIER: 'Courier', RESOLUTION: 'Resolution',
+    REFUND_VALUE: 'Refund Value', ORDER_NUMBER: 'Shopify/Warehouse Number',
+  },
+  pool: { product: 'CSLT Pool Tables', supplierReason: 'Item Damaged::Supplier Issue', courierReason: 'Item Damaged::Courier Fault' },
+  arcade: { products: ['Upright Arcade', 'Cocktail Pro', 'Cocktail MKII'], reason: 'Item Not Working' },
+  pinball: { products: ['Pinball Machine', 'Gearshift Pro'], reasons: ['Item Not Working', 'Item Damaged::Supplier Issue'] },
+  courier: { reasons: ['Item Missing::Courier Fault', 'WISMO::Item Delayed::Courier Fault', 'WISMO::Wrong Address::Customer Fault', 'Item Damaged::Courier Fault'] },
+  ops: { reasons: ['Item Missing::Picking Issue::Ops Mistake', 'WISMO::Tracking Not Supplied', 'WISMO::Item Delayed::Ops Delay', 'WISMO::Wrong Address::Ops Fault', 'Wrong Item Delivered::Ops Misorder'] },
+  refunds: { refundValues: ['Refund', 'Partial Refund'], replacementValues: ['Free Product Upgrade', 'Free Gift', 'Replacement Sent'] },
+}
+
+function SettingsPanel({ onClose, authFetch, onApply }) {
+  const [tab, setTab] = useState('fields')
+  const [config, setConfig] = useState(() => {
+    if (typeof window === 'undefined') return JSON.parse(JSON.stringify(DEFAULT_DASH_CONFIG))
+    try { const s = localStorage.getItem('__dashConfig'); if (s) return JSON.parse(s) } catch(e) {}
+    return JSON.parse(JSON.stringify(DEFAULT_DASH_CONFIG))
+  })
+  const [gorgiasFields, setGorgiasFields] = useState([])
+  const [ticketValues, setTicketValues] = useState({})
+  const [fetchingFields, setFetchingFields] = useState(false)
+
+  useEffect(() => {
+    setFetchingFields(true)
+    authFetch('/api/custom-fields')
+      .then(j => setGorgiasFields((j.data || []).filter(f => f.label).map(f => ({ id: f.id, label: f.label }))))
+      .catch(() => {})
+      .finally(() => setFetchingFields(false))
+    // Load values from live ticket data if a report has been run
+    const st = window.__state
+    if (st && st.tickets && st.fieldMap) {
+      const allTix = [...(st.tickets || []), ...(st.ticketsPrev || [])]
+      const vals = {}
+      Object.entries(st.fieldMap).forEach(([labelLower, id]) => {
+        const set = new Set()
+        allTix.forEach(t => {
+          const v = t.custom_fields?.[String(id)]?.value
+          if (v != null && v !== '' && String(v).toLowerCase() !== 'not set') set.add(String(v))
+        })
+        vals[labelLower] = [...set].sort()
+      })
+      setTicketValues(vals)
+    }
+  }, [])
+
+  function upd(path, value) {
+    setConfig(prev => {
+      const next = JSON.parse(JSON.stringify(prev))
+      const parts = path.split('.')
+      let obj = next
+      for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]]
+      obj[parts[parts.length - 1]] = value
+      return next
+    })
+  }
+
+  function save() {
+    localStorage.setItem('__dashConfig', JSON.stringify(config))
+    window.__dashConfig = config
+    onApply()
+    onClose()
+  }
+
+  function resetToDefaults() {
+    if (!confirm('Reset all settings to defaults?')) return
+    setConfig(JSON.parse(JSON.stringify(DEFAULT_DASH_CONFIG)))
+  }
+
+  function getTicketVals(fieldRole) {
+    const label = (config.fieldNames[fieldRole] || '').toLowerCase()
+    return ticketValues[label] || []
+  }
+
+  const reasonsAvail = getTicketVals('REASON')
+  const productsAvail = getTicketVals('PRODUCT')
+  const resolutionAvail = getTicketVals('RESOLUTION')
+
+  const FIELD_ROLES = [
+    { key: 'PRODUCT', label: 'Product field' },
+    { key: 'REASON', label: 'Contact Reason field' },
+    { key: 'DAMAGE', label: 'Pool Table Damage field' },
+    { key: 'ARCADE_ISSUE', label: 'Arcade Issue/Damage field' },
+    { key: 'PINBALL_ISSUE', label: 'Pinball Issue field' },
+    { key: 'BROKEN_GAMES', label: 'Broken Games field' },
+    { key: 'COURIER', label: 'Courier field' },
+    { key: 'RESOLUTION', label: 'Resolution field' },
+    { key: 'REFUND_VALUE', label: 'Refund Value field' },
+    { key: 'ORDER_NUMBER', label: 'Order Number field' },
+  ]
+
+  const iStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-1)', borderRadius: 6, padding: '7px 10px', fontFamily: 'var(--font-body)', fontSize: '.85rem', outline: 'none', width: '100%' }
+  const secStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 8, padding: 16, marginBottom: 16 }
+  const secTitle = { fontFamily: 'var(--font-head)', fontWeight: 700, fontSize: '.9rem', marginBottom: 12, color: 'var(--text-1)' }
+  const fldLabel = { fontSize: '.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em', color: 'var(--text-2)', marginBottom: 6, marginTop: 12 }
+  const TABS = [['fields','Field Mapping'],['pool','🎱 Pool'],['arcade','🕹 Arcades'],['pinball','🎰 Pinball'],['courier','🚚 Courier'],['ops','⚙️ Ops'],['refunds','💰 Refunds']]
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.6)', zIndex:200, display:'flex', justifyContent:'flex-end' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div style={{ width:720, background:'var(--bg-card)', borderLeft:'1px solid var(--border)', display:'flex', flexDirection:'column', height:'100vh', overflow:'hidden' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding:'18px 24px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
+          <div style={{ fontFamily:'var(--font-head)', fontWeight:800, fontSize:'1.1rem', display:'flex', alignItems:'center', gap:10 }}>
+            ⚙️ Dashboard Settings
+            {fetchingFields && <span style={{ fontSize:'.75rem', color:'var(--text-3)', fontWeight:400, fontFamily:'var(--font-body)' }}>loading fields…</span>}
+          </div>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'var(--text-2)', cursor:'pointer', fontSize:'1.2rem', padding:'4px 8px' }}>✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display:'flex', borderBottom:'1px solid var(--border)', flexShrink:0, overflowX:'auto' }}>
+          {TABS.map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              style={{ padding:'10px 16px', fontSize:'.82rem', fontWeight: tab===id ? 600 : 400, color: tab===id ? 'var(--blue)' : 'var(--text-2)', cursor:'pointer', background:'none', border:'none', borderBottom: tab===id ? '2px solid var(--blue)' : '2px solid transparent', fontFamily:'var(--font-body)', whiteSpace:'nowrap', flexShrink:0 }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div style={{ flex:1, overflowY:'auto', padding:'20px 24px' }}>
+
+          {/* ── Field Mapping ── */}
+          {tab === 'fields' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>
+                Map each dashboard role to the exact label of your Gorgias custom field. Case-insensitive. If you add or rename a field in Gorgias, update it here.
+                {gorgiasFields.length > 0 && <span style={{ color:'var(--green)', marginLeft:8 }}>✓ {gorgiasFields.length} Gorgias fields loaded</span>}
+              </p>
+              {FIELD_ROLES.map(({ key, label }) => (
+                <div key={key} style={{ display:'grid', gridTemplateColumns:'200px 1fr', alignItems:'center', gap:12, marginBottom:10 }}>
+                  <div style={{ fontSize:'.84rem', color:'var(--text-1)' }}>{label}</div>
+                  {gorgiasFields.length > 0 ? (
+                    <select value={config.fieldNames[key] || ''} onChange={e => upd('fieldNames.' + key, e.target.value)} style={{ ...iStyle, cursor:'pointer' }}>
+                      <option value="">-- not mapped --</option>
+                      {gorgiasFields.map(f => <option key={f.id} value={f.label}>{f.label}</option>)}
+                      {config.fieldNames[key] && !gorgiasFields.find(f => f.label === config.fieldNames[key]) && (
+                        <option value={config.fieldNames[key]}>{config.fieldNames[key]} (current)</option>
+                      )}
+                    </select>
+                  ) : (
+                    <input value={config.fieldNames[key] || ''} onChange={e => upd('fieldNames.' + key, e.target.value)} placeholder="e.g. Contact Reason" style={iStyle} />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ── Pool Tables ── */}
+          {tab === 'pool' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>Configure the product name and contact reasons used for Pool Table damage reporting.</p>
+              <div style={secStyle}>
+                <div style={secTitle}>Product</div>
+                <div style={fldLabel}>Product name (exact match from Gorgias)</div>
+                <SPicker value={config.pool.product} available={productsAvail} onChange={v => upd('pool.product', v)} iStyle={iStyle} />
+              </div>
+              <div style={secStyle}>
+                <div style={secTitle}>Contact Reasons</div>
+                <div style={fldLabel}>Supplier issue reason</div>
+                <SPicker value={config.pool.supplierReason} available={reasonsAvail} onChange={v => upd('pool.supplierReason', v)} iStyle={iStyle} />
+                <div style={fldLabel}>Courier fault reason</div>
+                <SPicker value={config.pool.courierReason} available={reasonsAvail} onChange={v => upd('pool.courierReason', v)} iStyle={iStyle} />
+              </div>
+            </div>
+          )}
+
+          {/* ── Arcades ── */}
+          {tab === 'arcade' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>Configure which products and contact reason are tracked for Arcade reporting.</p>
+              <div style={secStyle}>
+                <div style={secTitle}>Products</div>
+                <LEditor values={config.arcade.products} available={productsAvail} onChange={v => upd('arcade.products', v)} iStyle={iStyle} ph="e.g. Upright Arcade" />
+              </div>
+              <div style={secStyle}>
+                <div style={secTitle}>Filter by Contact Reason (single)</div>
+                <SPicker value={config.arcade.reason} available={reasonsAvail} onChange={v => upd('arcade.reason', v)} iStyle={iStyle} />
+              </div>
+            </div>
+          )}
+
+          {/* ── Pinball ── */}
+          {tab === 'pinball' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>Configure products and contact reasons for Kelvin Pinball reporting.</p>
+              <div style={secStyle}>
+                <div style={secTitle}>Products</div>
+                <LEditor values={config.pinball.products} available={productsAvail} onChange={v => upd('pinball.products', v)} iStyle={iStyle} ph="e.g. Pinball Machine" />
+              </div>
+              <div style={secStyle}>
+                <div style={secTitle}>Contact Reasons (filter)</div>
+                <LEditor values={config.pinball.reasons} available={reasonsAvail} onChange={v => upd('pinball.reasons', v)} iStyle={iStyle} ph="e.g. Item Not Working" />
+              </div>
+            </div>
+          )}
+
+          {/* ── Courier ── */}
+          {tab === 'courier' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>These contact reasons determine which tickets appear in the Courier Issues section.</p>
+              <div style={secStyle}>
+                <div style={secTitle}>Courier Contact Reasons</div>
+                <LEditor values={config.courier.reasons} available={reasonsAvail} onChange={v => upd('courier.reasons', v)} iStyle={iStyle} ph="e.g. Item Missing::Courier Fault" />
+              </div>
+            </div>
+          )}
+
+          {/* ── Ops ── */}
+          {tab === 'ops' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>These contact reasons determine which tickets appear in the Ops Issues section.</p>
+              <div style={secStyle}>
+                <div style={secTitle}>Ops Contact Reasons</div>
+                <LEditor values={config.ops.reasons} available={reasonsAvail} onChange={v => upd('ops.reasons', v)} iStyle={iStyle} ph="e.g. Item Missing::Picking Issue::Ops Mistake" />
+              </div>
+            </div>
+          )}
+
+          {/* ── Refunds ── */}
+          {tab === 'refunds' && (
+            <div>
+              <p style={{ color:'var(--text-2)', fontSize:'.85rem', marginBottom:16, lineHeight:1.6 }}>Configure which Resolution field values count as refunds and replacements.</p>
+              <div style={secStyle}>
+                <div style={secTitle}>Refund Values</div>
+                <LEditor values={config.refunds.refundValues} available={resolutionAvail} onChange={v => upd('refunds.refundValues', v)} iStyle={iStyle} ph="e.g. Refund" />
+              </div>
+              <div style={secStyle}>
+                <div style={secTitle}>Replacement Values</div>
+                <LEditor values={config.refunds.replacementValues} available={resolutionAvail} onChange={v => upd('refunds.replacementValues', v)} iStyle={iStyle} ph="e.g. Replacement Sent" />
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding:'14px 24px', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+          <button onClick={resetToDefaults} style={{ background:'none', border:'1px solid var(--border)', color:'var(--text-2)', borderRadius:6, padding:'8px 14px', cursor:'pointer', fontFamily:'var(--font-body)', fontSize:'.84rem' }}>
+            Reset to Defaults
+          </button>
+          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            <span style={{ fontSize:'.78rem', color:'var(--text-3)' }}>Saved to browser · persists across sessions</span>
+            <button onClick={save} style={{ background:'var(--blue)', color:'#fff', border:'none', borderRadius:6, padding:'8px 20px', cursor:'pointer', fontFamily:'var(--font-body)', fontWeight:600, fontSize:'.9rem' }}>
+              Save &amp; Apply
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
+// ── List Editor (drag-to-reorder, click-to-add) ───────────────
+function LEditor({ values, available, onChange, iStyle, ph }) {
+  const [newVal, setNewVal] = useState('')
+  const [dragIdx, setDragIdx] = useState(null)
+  const [dragOver, setDragOver] = useState(null)
+
+  const notActive = (available || []).filter(v => !values.includes(v))
+
+  function add(v) { const t = v.trim(); if (t && !values.includes(t)) onChange([...values, t]) }
+  function remove(v) { onChange(values.filter(x => x !== v)) }
+  function onDS(i) { setDragIdx(i) }
+  function onDO(e, i) { e.preventDefault(); setDragOver(i) }
+  function onDrop(i) {
+    if (dragIdx !== null && dragIdx !== i) {
+      const next = [...values]; const [item] = next.splice(dragIdx, 1); next.splice(i, 0, item); onChange(next)
+    }
+    setDragIdx(null); setDragOver(null)
+  }
+
+  const boxStyle = { background:'var(--bg-canvas)', border:'1px solid var(--border)', borderRadius:6, minHeight:80, padding:6, marginBottom:8 }
+  const colHd = { fontSize:'.7rem', fontWeight:600, textTransform:'uppercase', letterSpacing:'.05em', color:'var(--text-3)', marginBottom:6 }
+
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginTop:8 }}>
+      {/* Left: Available */}
+      <div>
+        <div style={colHd}>Available from ticket data {!available.length && '(run report first)'}</div>
+        <div style={boxStyle}>
+          {!notActive.length && (
+            <div style={{ color:'var(--text-3)', fontSize:'.8rem', padding:'6px', fontStyle:'italic' }}>
+              {!available.length ? 'Run a report to populate this list' : 'All available values are already active'}
+            </div>
+          )}
+          {notActive.map(v => (
+            <div key={v} onClick={() => add(v)}
+              style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 8px', borderRadius:4, cursor:'pointer', marginBottom:2, background:'var(--bg-elevated)', fontSize:'.83rem' }}
+              onMouseEnter={e => e.currentTarget.style.background='var(--bg-hover)'}
+              onMouseLeave={e => e.currentTarget.style.background='var(--bg-elevated)'}>
+              <span style={{ color:'var(--text-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', flex:1 }}>{v}</span>
+              <span style={{ color:'var(--blue)', fontSize:'.72rem', flexShrink:0, marginLeft:6 }}>+ add</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ display:'flex', gap:6 }}>
+          <input value={newVal} onChange={e => setNewVal(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { add(newVal); setNewVal('') } }}
+            placeholder={ph || 'Type value and press Enter…'} style={{ ...iStyle, flex:1 }} />
+          <button onClick={() => { add(newVal); setNewVal('') }}
+            style={{ background:'var(--blue)', color:'#fff', border:'none', borderRadius:6, padding:'0 12px', cursor:'pointer', fontSize:'.84rem', flexShrink:0, fontFamily:'var(--font-body)' }}>Add</button>
+        </div>
+      </div>
+      {/* Right: Active */}
+      <div>
+        <div style={colHd}>Active ({values.length}) — drag to reorder</div>
+        <div style={boxStyle}>
+          {!values.length && <div style={{ color:'var(--text-3)', fontSize:'.8rem', padding:'6px', fontStyle:'italic' }}>No active values — add from the left</div>}
+          {values.map((v, i) => (
+            <div key={v} draggable
+              onDragStart={() => onDS(i)} onDragOver={e => onDO(e, i)} onDrop={() => onDrop(i)} onDragEnd={() => { setDragIdx(null); setDragOver(null) }}
+              style={{ display:'flex', alignItems:'center', padding:'6px 8px', borderRadius:4, cursor:'grab', marginBottom:2, fontSize:'.83rem', background: dragOver===i ? 'var(--blue-soft)' : 'var(--bg-elevated)', border: dragOver===i ? '1px solid rgba(79,142,255,.3)' : '1px solid transparent', transition:'background .1s' }}>
+              <span style={{ color:'var(--text-3)', marginRight:8, cursor:'grab' }}>⠿</span>
+              <span style={{ flex:1, color:'var(--text-1)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{v}</span>
+              <button onClick={() => remove(v)} style={{ background:'none', border:'none', color:'var(--text-3)', cursor:'pointer', padding:'0 4px', fontSize:'.9rem', flexShrink:0 }}>✕</button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Single Value Picker ───────────────────────────────────────
+function SPicker({ value, available, onChange, iStyle }) {
+  if (available && available.length > 0) {
+    return (
+      <select value={value} onChange={e => onChange(e.target.value)} style={{ ...iStyle, cursor:'pointer' }}>
+        {available.map(v => <option key={v} value={v}>{v}</option>)}
+        {value && !available.includes(value) && <option value={value}>{value} (current)</option>}
+      </select>
+    )
+  }
+  return <input value={value || ''} onChange={e => onChange(e.target.value)} style={iStyle} />
 }
 
 // ── Comparison Section ───────────────────────────────────────
@@ -577,18 +943,11 @@ table.ticket-table td:first-child{font-family:var(--font-data);font-size:.75rem;
 `
 
 const DASHBOARD_LOGIC = `
-const FIELD_NAMES={PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'};
-const POOL_PRODUCT='CSLT Pool Tables';
-const REASON_SUPPLIER='Item Damaged::Supplier Issue';
-const REASON_COURIER_POOL='Item Damaged::Courier Fault';
-const ARCADE_PRODUCTS=['Upright Arcade','Cocktail Pro','Cocktail MKII'];
-const ARCADE_REASON='Item Not Working';
-const KELVIN_PRODUCTS=['Pinball Machine','Gearshift Pro'];
-const KELVIN_REASONS=['Item Not Working','Item Damaged::Supplier Issue'];
-const COURIER_REASONS=['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault'];
-const OPS_REASONS=['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder'];
-const REFUND_VALUES=['Refund','Partial Refund'];
-const REPLACEMENT_VALUES=['Free Product Upgrade','Free Gift','Replacement Sent'];
+// ── Config — reads from window.__dashConfig (set by SettingsPanel) with fallbacks ──
+const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
+let FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,COURIER_REASONS,OPS_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
+function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER};POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
+loadConfig();
 
 // ── Collapsible blocks ───────────────────────────────────────
 const collapseState={};
@@ -711,6 +1070,7 @@ async function runReport(){
     addLog('✓ Fetched '+state.tickets.length+' current + '+state.ticketsPrev.length+' prev tickets','done');
     addLog('→ Processing & rendering…');
     state.hasData=true;renderAll();
+    window.__state=state;
     barEl.style.width='100%';addLog('✓ Done!','done');
     document.getElementById('last-run-time').textContent='Updated '+new Date().toLocaleTimeString();
     setTimeout(()=>showLoading(false),500);
@@ -733,6 +1093,7 @@ async function runReport(){
 function updateBadges(){document.getElementById('badge-overview').textContent=state.tickets.length;}
 
 function renderAll(){
+  loadConfig();
   renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();updateBadges();
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
