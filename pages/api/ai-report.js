@@ -65,7 +65,9 @@ Format your response using markdown. Be direct, specific, and focused on actiona
     if (!aiRes.ok) {
       const errBody = await aiRes.text()
       console.error('Anthropic API error:', aiRes.status, errBody)
-      return res.status(502).json({ error: `AI API error: ${aiRes.status}` })
+      let errDetail = ''
+      try { errDetail = JSON.parse(errBody)?.error?.message || errBody } catch { errDetail = errBody }
+      return res.status(502).json({ error: `AI API error ${aiRes.status}: ${errDetail.slice(0, 300)}` })
     }
 
     const aiData = await aiRes.json()
