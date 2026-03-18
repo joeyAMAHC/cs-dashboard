@@ -32,7 +32,11 @@ export default function Dashboard() {
     const res = await fetch(url, {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     })
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    if (!res.ok) {
+      let msg = `HTTP ${res.status}`
+      try { const j = await res.json(); msg = j.error?.message || j.error || j.detail || msg } catch(e) {}
+      throw new Error(msg)
+    }
     return res.json()
   }
 

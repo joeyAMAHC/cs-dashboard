@@ -47,6 +47,11 @@ export default async function handler(req, res) {
   try {
     const cursor = req.query.cursor ? `&cursor=${encodeURIComponent(req.query.cursor)}` : ''
     const result = await gorgiasRequest(`/api/tickets?limit=100&order_by=created_datetime:desc${cursor}`)
+    if (result.status !== 200) {
+      console.error('Gorgias error:', result.status, JSON.stringify(result.body))
+      const detail = result.body?.errors?.[0]?.message || result.body?.error?.message || result.body?.message || JSON.stringify(result.body)
+      return res.status(result.status).json({ error: `Gorgias ${result.status}: ${detail}` })
+    }
     res.status(result.status).json(result.body)
   } catch (e) {
     res.status(500).json({ error: e.message })
