@@ -106,6 +106,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
     window.__renderAll = renderAll
     window.__toggleAgent = toggleAgent
     window.__generateAIReport = generateAIReport
+    window.__loadCsAgent = loadCsAgent
 
     return () => {
       delete window.__authFetch
@@ -116,6 +117,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
       delete window.__renderAll
       delete window.__toggleAgent
       delete window.__generateAIReport
+      delete window.__loadCsAgent
       delete window.__state
     }
   }, [])
@@ -205,6 +207,9 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
           <div className="nav-item" data-section="ai-report" onClick={() => window.__showSection('ai-report')}>
             <span className="nav-icon">🤖</span> AI Insights
           </div>
+          <div className="nav-item" data-section="cs-agent" onClick={() => { window.__showSection('cs-agent'); window.__loadCsAgent && window.__loadCsAgent(); }}>
+            <span className="nav-icon">📊</span> CS Agent Analytics
+          </div>
           <div className="sidebar-footer">
             <div id="last-run-time" style={{ fontSize: '.72rem', color: 'var(--text-3)', padding: '0 10px' }} />
           </div>
@@ -253,6 +258,12 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
           <div id="section-ai-report" className="section-view">
             <div id="ai-report-content">
               <div className="empty-state"><div className="empty-state-msg">Run the report first, then generate AI insights</div></div>
+            </div>
+          </div>
+
+          <div id="section-cs-agent" className="section-view">
+            <div id="cs-agent-content">
+              <div className="empty-state"><div className="empty-state-msg">Click "CS Agent Analytics" to load</div></div>
             </div>
           </div>
         </main>
@@ -1329,6 +1340,7 @@ table.data-table .total-row td{font-weight:700;color:var(--blue);background:var(
 table.ticket-table{font-size:.8rem}
 table.ticket-table td:first-child{font-family:var(--font-data);font-size:.75rem;color:var(--blue)}
 .accent-blue{color:var(--blue)}.accent-green{color:var(--green)}.accent-amber{color:var(--amber)}.accent-red{color:var(--red)}.accent-purple{color:var(--purple)}
+table.csa-table{width:100%;border-collapse:collapse;font-size:.85rem}table.csa-table td{padding:9px 12px;border-bottom:1px solid var(--border-soft);color:var(--text-1);vertical-align:middle}table.csa-table tr:hover>td{background:var(--bg-2)}table.csa-table td:first-child{font-weight:500}
 .dot-blue{background:var(--blue)}.dot-green{background:var(--green)}.dot-amber{background:var(--amber)}.dot-red{background:var(--red)}.dot-purple{background:var(--purple)}.dot-cyan{background:var(--cyan)}
 /* AI Report */
 .ai-report-body{line-height:1.7;font-size:.9rem;color:var(--text-1)}
@@ -2107,6 +2119,201 @@ async function generateAIReport(){
       '<br><br><small style="color:var(--text-3)">Make sure ANTHROPIC_API_KEY is set in your Vercel environment variables.</small>'+
       '</div></div></div>';
   }
+}
+
+// ── CS Agent Analytics ─────────────────────────────────────────────────────────
+// Loads AI-classified ticket data from the local CS Agent (via /api/cs-analytics proxy).
+// Shows breakdowns by issue category, product, courier, ops — plus an AI chat.
+
+let csAgentRange='30d';
+let csAgentData=null;
+let csAgentChatHistory=[];
+let csAgentLoaded=false;
+
+async function loadCsAgent(range){
+  if(range)csAgentRange=range;
+  csAgentLoaded=true;
+  const el=document.getElementById('cs-agent-content');
+  if(!el)return;
+  el.innerHTML='<div class="empty-state"><div class="empty-state-msg" style="padding:40px">⏳ Loading CS Agent data…</div></div>';
+  try{
+    const data=await window.__authFetch('/api/cs-analytics?range='+csAgentRange);
+    if(data.empty){el.innerHTML='<div class="empty-state"><div class="empty-state-msg">No classified tickets found for this period.</div></div>';return;}
+    csAgentData=data;
+    csAgentChatHistory=[];
+    renderCsAgent(data);
+  }catch(err){
+    el.innerHTML='<div class="page-header"><div><div class="page-title accent-red">📊 CS Agent Analytics</div></div></div>'+
+      '<div class="section-block"><div class="section-block-body"><div style="color:var(--red);padding:16px">'+
+      'Could not reach CS Agent: '+(err.message||'Unknown error')+
+      '<br><br><small style="color:var(--text-3)">Make sure the CS Agent server is running and CS_AGENT_URL is set in your environment variables (Vercel or .env.local).</small>'+
+      '</div></div></div>';
+  }
+}
+
+function renderCsAgent(data){
+  const el=document.getElementById('cs-agent-content');
+  const c=data.current;const p=data.previous;
+  const rangeLabel={'7d':'Last 7 days','30d':'Last 30 days','90d':'Last 90 days','all':'All time'}[csAgentRange]||csAgentRange;
+
+  const rangeButtons=['7d','30d','90d','all'].map(r=>
+    '<button onclick="window.__loadCsAgent(\''+r+'\')" style="padding:5px 12px;border:1px solid var(--border);border-radius:4px;background:'+(r===csAgentRange?'var(--blue)':'var(--bg-2)')+';color:'+(r===csAgentRange?'#fff':'var(--text-1)')+';font-size:.8rem;cursor:pointer;margin-right:6px">'+({'7d':'7d','30d':'30d','90d':'90d','all':'All'}[r])+'</button>'
+  ).join('');
+
+  // Summary strip
+  const summaryHtml='<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:20px">'+
+    csaCard('Tickets',c.totalTickets,csaTrend(c.totalTickets,p.totalTickets))+
+    csaCard('Issues',c.totalIssues,csaTrend(c.totalIssues,p.totalIssues))+
+    (c.totalRefunds>0?csaCard('Refunds','$'+Math.round(c.totalRefunds).toLocaleString(),'','var(--green)'):'') +
+    csaCard('Accuracy',c.accuracyPct+'%','Staff fields')+
+    '</div>';
+
+  // Category table
+  const maxCat=c.byCategory[0]?.[1]||1;
+  const catRows=c.byCategory.map(([cat,count])=>{
+    const prev=p.byCategory.find(([k])=>k===cat)?.[1]??0;
+    const pct=Math.round((count/c.totalIssues)*100);
+    const label=cat.replace(/_/g,' ').replace(/\b\w/g,ch=>ch.toUpperCase());
+    const trend=csaTrendInline(count,prev);
+    const bar='<div style="width:'+Math.round((count/maxCat)*100)+'%;height:5px;background:var(--blue);border-radius:2px;opacity:.7"></div>';
+    return '<tr><td>'+label+'</td><td style="width:80px">'+bar+'</td><td style="text-align:right;font-weight:700">'+count+'</td><td style="text-align:right;font-size:.8rem;color:var(--text-3)">'+pct+'%</td><td style="text-align:right;font-size:.8rem">'+trend+'</td></tr>';
+  }).join('');
+
+  // Product accordion
+  const maxProd=c.byProduct[0]?.[1]||1;
+  const prodRows=c.byProduct.map(([prod,count])=>{
+    const bd=c.productBreakdown[prod]||{};
+    const bdId='csa-prod-'+prod.replace(/\W/g,'_');
+    const bdRows=Object.entries(bd).sort((a,b)=>b[1]-a[1]).map(([cat,n])=>'<tr style="background:var(--bg-2)"><td style="padding-left:28px;font-size:.82rem;color:var(--text-2)">'+cat.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+'</td><td></td><td style="text-align:right;font-size:.82rem">'+n+'</td><td></td><td></td></tr>').join('');
+    const bar='<div style="width:'+Math.round((count/maxProd)*100)+'%;height:5px;background:var(--blue);border-radius:2px;opacity:.7"></div>';
+    return '<tr onclick="(function(){var el=document.getElementById(\''+bdId+'\');if(!el)return;var open=el.style.display===\'none\'||!el.style.display;el.style.display=open?\'table-row-group\':\'none\';var arr=document.getElementById(\'arr-'+bdId+'\');if(arr)arr.textContent=open?\'▼\':\'▶\'})()" style="cursor:pointer">'+
+      '<td>'+prod+' <span id="arr-'+bdId+'" style="font-size:.7rem;color:var(--text-3)">▶</span></td>'+
+      '<td style="width:80px">'+bar+'</td><td style="text-align:right;font-weight:700">'+count+'</td><td></td><td></td></tr>'+
+      '<tbody id="'+bdId+'" style="display:none">'+bdRows+'</tbody>';
+  }).join('');
+
+  // Courier accordion
+  const courierSection=c.byCourier.length>0?(()=>{
+    const maxC=c.byCourier[0]?.[1]||1;
+    const rows=c.byCourier.map(([courier,count])=>{
+      const prev=p.byCourier.find(([k])=>k===courier)?.[1]??0;
+      const bd=c.courierBreakdown[courier]||{};
+      const bdId='csa-cour-'+courier.replace(/\W/g,'_');
+      const bdRows=Object.entries(bd).sort((a,b)=>b[1]-a[1]).map(([cat,n])=>'<tr style="background:var(--bg-2)"><td style="padding-left:28px;font-size:.82rem;color:var(--text-2)">'+cat.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+'</td><td></td><td style="text-align:right;font-size:.82rem">'+n+'</td><td></td><td></td></tr>').join('');
+      const bar='<div style="width:'+Math.round((count/maxC)*100)+'%;height:5px;background:var(--blue);border-radius:2px;opacity:.7"></div>';
+      const spike=count>=3&&prev>0&&count>prev*1.5?' ⚠️':'';
+      const trend=csaTrendInline(count,prev);
+      return '<tr onclick="(function(){var el=document.getElementById(\''+bdId+'\');if(!el)return;var open=el.style.display===\'none\'||!el.style.display;el.style.display=open?\'table-row-group\':\'none\'})()" style="cursor:pointer">'+
+        '<td>'+courier+spike+'</td><td style="width:80px">'+bar+'</td><td style="text-align:right;font-weight:700">'+count+'</td><td></td><td style="text-align:right;font-size:.8rem">'+trend+'</td></tr>'+
+        '<tbody id="'+bdId+'" style="display:none">'+bdRows+'</tbody>';
+    }).join('');
+    return csaSection('🚚 Issues by Courier','<table class="csa-table">'+rows+'</table>','Click rows to expand');
+  })():'';
+
+  // Ops section
+  const opsSection=c.opsIssuesCount>0?(()=>{
+    const rows=Object.entries(c.opsByRootCause).map(([rootCause,cats])=>{
+      const total=Object.values(cats).reduce((s,v)=>s+v,0);
+      const bdId='csa-ops-'+rootCause.replace(/\W/g,'_');
+      const bdRows=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,n])=>'<tr style="background:var(--bg-2)"><td style="padding-left:28px;font-size:.82rem;color:var(--text-2)">'+cat.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())+'</td><td></td><td style="text-align:right;font-size:.82rem">'+n+'</td><td></td><td></td></tr>').join('');
+      const label=rootCause.charAt(0).toUpperCase()+rootCause.slice(1);
+      return '<tr onclick="(function(){var el=document.getElementById(\''+bdId+'\');if(!el)return;var open=el.style.display===\'none\'||!el.style.display;el.style.display=open?\'table-row-group\':\'none\'})()" style="cursor:pointer">'+
+        '<td>'+label+'</td><td></td><td style="text-align:right;font-weight:700">'+total+'</td><td></td><td></td></tr>'+
+        '<tbody id="'+bdId+'" style="display:none">'+bdRows+'</tbody>';
+    }).join('');
+    return csaSection('⚙️ Ops / Supplier / Warehouse','<table class="csa-table">'+rows+'</table>',c.opsIssuesCount+' issues · Click rows to expand');
+  })():'';
+
+  // AI Chat
+  const chatHtml='<div class="section-block" style="margin-top:16px">'+
+    '<div class="section-block-header" style="display:flex;align-items:center;gap:8px">'+
+    '<div class="section-block-label">🤖 Ask the AI about this data</div>'+
+    '<div style="font-size:.75rem;color:var(--text-3)">Asks about the classified ticket data</div>'+
+    '</div>'+
+    '<div class="section-block-body">'+
+    '<div id="csa-chat-msgs" style="display:flex;flex-direction:column;gap:10px;max-height:320px;overflow-y:auto;margin-bottom:12px;padding:4px 0">'+
+    '<div style="background:var(--bg-2);border-radius:8px;padding:10px 14px;font-size:.87rem;line-height:1.5;align-self:flex-start;max-width:90%">'+
+    'Hi! I can see all '+c.totalTickets+' classified tickets for this period. Ask me anything — e.g. "What\'s causing the most issues?", "Which product needs attention this week?", or "Give me 3 action items."'+
+    '</div></div>'+
+    '<div style="display:flex;gap:8px">'+
+    '<input id="csa-chat-input" type="text" placeholder="Ask a question about the data…" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:6px;font-size:.87rem;background:var(--bg-1);color:var(--text-1);outline:none" onkeydown="if(event.key===\'Enter\')window.__csaAsk()">'+
+    '<button onclick="window.__csaAsk()" style="padding:9px 16px;background:var(--blue);color:#fff;border:none;border-radius:6px;font-size:.87rem;font-weight:600;cursor:pointer">Ask →</button>'+
+    '</div></div></div>';
+
+  el.innerHTML='<div class="page-header"><div>'+
+    '<div class="page-title" style="background:linear-gradient(135deg,#0052cc,#00b8d9);-webkit-background-clip:text;-webkit-text-fill-color:transparent">📊 CS Agent Analytics</div>'+
+    '<div class="page-subtitle">AI-classified ticket data — '+c.totalTickets+' tickets · '+rangeLabel+'</div>'+
+    '</div>'+
+    '<div style="display:flex;align-items:center;gap:8px">'+rangeButtons+
+    '<div class="period-badge">'+rangeLabel+'</div></div></div>'+
+    summaryHtml+
+    csaSection('🔴 Issues by Category','<table class="csa-table">'+catRows+'</table>')+
+    csaSection('📦 Issues by Product','<table class="csa-table">'+prodRows+'</table>','Click rows to expand')+
+    courierSection+
+    opsSection+
+    chatHtml;
+
+  // expose chat ask function
+  window.__csaAsk=async function(){
+    const input=document.getElementById('csa-chat-input');
+    const question=input?.value?.trim();
+    if(!question)return;
+    input.value='';
+    csaChatAppend('user',question);
+    const thinking=document.createElement('div');
+    thinking.id='csa-thinking';
+    thinking.style.cssText='color:var(--text-3);font-size:.82rem;font-style:italic;padding:4px 0';
+    thinking.textContent='⏳ Thinking…';
+    document.getElementById('csa-chat-msgs').appendChild(thinking);
+    csaChatScroll();
+    try{
+      const res=await window.__authPost('/api/cs-analytics',{question,range:csAgentRange,history:csAgentChatHistory});
+      document.getElementById('csa-thinking')?.remove();
+      if(res.answer){
+        csAgentChatHistory.push({role:'user',content:question});
+        csAgentChatHistory.push({role:'assistant',content:res.answer});
+        csaChatAppend('assistant',res.answer);
+      }else{csaChatAppend('assistant','Error: '+(res.error||'No answer'));}
+    }catch(e){document.getElementById('csa-thinking')?.remove();csaChatAppend('assistant','Error: '+e.message);}
+  };
+}
+
+function csaChatAppend(role,text){
+  const msgs=document.getElementById('csa-chat-msgs');if(!msgs)return;
+  const div=document.createElement('div');
+  const isUser=role==='user';
+  div.style.cssText='background:'+(isUser?'var(--blue)':'var(--bg-2)')+';color:'+(isUser?'#fff':'var(--text-1)')+';border-radius:8px;padding:10px 14px;font-size:.87rem;line-height:1.5;align-self:'+(isUser?'flex-end':'flex-start')+';max-width:90%';
+  div.innerHTML=text.replace(/\n/g,'<br>');
+  msgs.appendChild(div);csaChatScroll();
+}
+function csaChatScroll(){const el=document.getElementById('csa-chat-msgs');if(el)el.scrollTop=el.scrollHeight;}
+function csaCard(label,value,sub,color){
+  return '<div style="background:var(--bg-2);border:1px solid var(--border);border-radius:8px;padding:12px 16px;min-width:100px">'+
+    '<div style="font-size:.72rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.4px">'+label+'</div>'+
+    '<div style="font-size:1.5rem;font-weight:800;color:'+(color||'var(--text-1)')+';line-height:1.2;margin-top:2px">'+value+'</div>'+
+    (sub?'<div style="font-size:.75rem;color:var(--text-3);margin-top:2px">'+sub+'</div>':'')+
+    '</div>';
+}
+function csaSection(title,body,sub){
+  return '<div class="section-block" style="margin-bottom:12px">'+
+    '<div class="section-block-header">'+
+    '<div class="section-block-label">'+title+'</div>'+
+    (sub?'<div style="font-size:.75rem;color:var(--text-3)">'+sub+'</div>':'')+
+    '</div>'+
+    '<div class="section-block-body">'+body+'</div></div>';
+}
+function csaTrend(cur,prev){
+  if(!prev||prev===0)return'';
+  const pct=Math.round(((cur-prev)/prev)*100);
+  if(Math.abs(pct)<5)return'';
+  return(pct>0?'↑':'↓')+Math.abs(pct)+'% vs prev';
+}
+function csaTrendInline(cur,prev){
+  if(!prev||prev===0)return cur>0?'<span style="color:var(--blue);font-weight:600">NEW</span>':'';
+  const pct=Math.round(((cur-prev)/prev)*100);
+  if(Math.abs(pct)<10)return'';
+  if(pct>0)return'<span style="color:var(--red)">↑'+pct+'%</span>';
+  return'<span style="color:var(--green)">↓'+Math.abs(pct)+'%</span>';
 }
 
 function showLoading(show){const el=document.getElementById('loading-overlay');if(show){el.classList.add('visible');document.getElementById('loading-log').innerHTML='';document.getElementById('loading-bar').style.width='0%';}else{el.classList.remove('visible');}}
