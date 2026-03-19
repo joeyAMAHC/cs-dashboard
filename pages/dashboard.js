@@ -182,6 +182,9 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
             { id: 'pool',        icon: '🎱', label: 'Pool Tables' },
             { id: 'arcade',      icon: '🕹',  label: 'Gao Arcades' },
             { id: 'pinball',     icon: '🎰', label: 'Kelvin Pinball' },
+            { id: 'kegerator',   icon: '🍺', label: 'Kegerators' },
+            { id: 'ledsigns',    icon: '💡', label: 'LED Bar Signs' },
+            { id: 'barfridge',   icon: '🧊', label: 'Bar Fridges' },
             { id: 'courier',     icon: '🚚', label: 'Courier Issues' },
             { id: 'ops',         icon: '⚙️', label: 'Ops Issues' },
             { id: 'refunds',     icon: '💰', label: 'Refunds & Replacements' },
@@ -203,9 +206,6 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
           <div className="nav-section-label" style={{ marginTop: 12 }}>Analysis</div>
           <div className="nav-item" data-section="comparison" onClick={() => window.__showSection('comparison')}>
             <span className="nav-icon">📅</span> MoM Comparison
-          </div>
-          <div className="nav-item" data-section="ai-report" onClick={() => window.__showSection('ai-report')}>
-            <span className="nav-icon">🤖</span> AI Insights
           </div>
           <div className="nav-item" data-section="cs-agent" onClick={() => { window.__showSection('cs-agent'); window.__loadCsAgent && window.__loadCsAgent(); }}>
             <span className="nav-icon">📊</span> CS Agent Analytics
@@ -233,7 +233,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
             <div id="overview-content" style={{ display: 'none' }} />
           </div>
 
-          {['pool','arcade','pinball','courier','ops','refunds'].map(id => (
+          {['pool','arcade','pinball','kegerator','ledsigns','barfridge','courier','ops','refunds'].map(id => (
             <div key={id} id={`section-${id}`} className="section-view">
               <div id={`${id}-content`}>
                 <div className="empty-state">
@@ -253,12 +253,6 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
 
           <div id="section-comparison" className="section-view">
             <ComparisonSection authFetch={authFetch} />
-          </div>
-
-          <div id="section-ai-report" className="section-view">
-            <div id="ai-report-content">
-              <div className="empty-state"><div className="empty-state-msg">Run the report first, then generate AI insights</div></div>
-            </div>
           </div>
 
           <div id="section-cs-agent" className="section-view">
@@ -1341,6 +1335,8 @@ table.ticket-table{font-size:.8rem}
 table.ticket-table td:first-child{font-family:var(--font-data);font-size:.75rem;color:var(--blue)}
 .accent-blue{color:var(--blue)}.accent-green{color:var(--green)}.accent-amber{color:var(--amber)}.accent-red{color:var(--red)}.accent-purple{color:var(--purple)}
 table.csa-table{width:100%;border-collapse:collapse;font-size:.85rem}table.csa-table td{padding:9px 12px;border-bottom:1px solid var(--border-soft);color:var(--text-1);vertical-align:middle}table.csa-table tr:hover>td{background:var(--bg-2)}table.csa-table td:first-child{font-weight:500}
+/* Ticket drill-down */
+.drill-row-hdr{cursor:pointer;transition:background .12s}.drill-row-hdr:hover td{background:var(--bg-elevated)!important}.drill-arrow{font-size:.65rem;color:var(--text-3);transition:transform .15s;display:inline-block;margin-left:5px}.drill-arrow.open{transform:rotate(90deg)}.drill-content{display:none}.drill-content.open{display:table-row}.drill-content>td{padding:0!important;border-bottom:1px solid var(--border)}.drill-list{background:var(--bg-elevated)}.drill-item{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 16px;border-bottom:1px solid var(--border-soft);font-size:.78rem}.drill-item:last-child{border-bottom:none}.drill-item a{color:var(--blue);text-decoration:none;font-family:var(--font-data);font-size:.73rem}.drill-item a:hover{text-decoration:underline}.drill-sep{color:var(--border);margin:0 1px}.drill-reason{color:var(--text-2)}.drill-res{color:var(--green);font-size:.75rem}
 .dot-blue{background:var(--blue)}.dot-green{background:var(--green)}.dot-amber{background:var(--amber)}.dot-red{background:var(--red)}.dot-purple{background:var(--purple)}.dot-cyan{background:var(--cyan)}
 /* AI Report */
 .ai-report-body{line-height:1.7;font-size:.9rem;color:var(--text-1)}
@@ -1611,7 +1607,7 @@ function renderCustomSections(){
 
 function renderAll(){
   loadConfig();
-  renderOverview();renderPool();renderArcade();renderPinball();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();try{renderAIReport();}catch(e){console.warn('AI report render error:',e);}
+  renderOverview();renderPool();renderArcade();renderPinball();renderKegerators();renderLEDBars();renderBarFridges();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
   // Wire up collapsible block headers + agent filter chips via event delegation
@@ -1622,6 +1618,15 @@ function renderAll(){
       if(hdr){toggleBlock(hdr.getAttribute('data-block-id'));return;}
       const agentChip=e.target.closest('[data-agent]');
       if(agentChip){toggleAgent(agentChip.getAttribute('data-agent'));return;}
+      const drillHdr=e.target.closest('[data-drill-id]');
+      if(drillHdr){
+        const did=drillHdr.getAttribute('data-drill-id');
+        const cnt=document.getElementById('dcnt-'+did);
+        const arr=document.getElementById('darr-'+did);
+        if(cnt)cnt.classList.toggle('open');
+        if(arr)arr.classList.toggle('open');
+        return;
+      }
     });
   }
 }
@@ -1666,6 +1671,66 @@ function breakdownTable(currRows,col1,prevTicketsFn){
     html+='<tr><td>'+esc(label)+'</td><td style="font-weight:600">'+tickets.length+'</td>'+
       (hasPrev?'<td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+prevCount+'</td><td style="text-align:right">'+chip+'</td>':'')+
       '<td><span class="tag tag-open">'+sc.open+'</span></td><td><span class="tag tag-closed">'+sc.closed+'</span></td><td><span class="tag tag-pending">'+sc.pending+'</span></td><td>'+(avg!==null?avg+'h':'—')+'</td></tr>';
+  });
+  html+='</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+gt+'</td>'+
+    (hasPrev?'<td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+gtp+'</td><td style="text-align:right">'+deltaChip(gt,gtp,true)+'</td>':'')+
+    '<td colspan="4"></td></tr></tfoot></table></div>';
+  return html;
+}
+
+// ── Ticket drill-down helpers ─────────────────────────────────
+let _drillId=0;
+function ticketDrillHtml(tickets,fieldMap){
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const resfid=fieldMap[FIELD_NAMES.RESOLUTION.toLowerCase()];
+  if(!tickets.length)return'<div style="padding:8px 16px;font-size:.8rem;color:var(--text-3)">No tickets</div>';
+  return'<div class="drill-list">'+[...tickets].sort((a,b)=>new Date(b.created_datetime)-new Date(a.created_datetime)).map(t=>{
+    const cust=esc((t.customer?.name)||'Unknown');
+    const reason=esc(getFieldById(t,rid));
+    const resolution=getFieldById(t,resfid);
+    const status=t.status||'open';
+    const sc=status==='closed'?'tag-closed':status==='pending'?'tag-pending':'tag-open';
+    const date=t.created_datetime?new Date(t.created_datetime).toLocaleDateString('en-AU'):'—';
+    const url='https://amanandhiscave.gorgias.com/conversations/'+t.id;
+    return'<div class="drill-item">'+
+      '<a href="'+url+'" target="_blank" rel="noopener">#'+t.id+'</a>'+
+      '<span class="drill-sep">·</span>'+
+      '<span style="font-weight:500">'+cust+'</span>'+
+      '<span class="drill-sep">·</span>'+
+      '<span class="drill-reason">'+reason+'</span>'+
+      (resolution&&resolution!=='Not Set'?'<span class="drill-sep">→</span><span class="drill-res">'+esc(resolution)+'</span>':'')+
+      '<span style="margin-left:auto;display:flex;align-items:center;gap:8px">'+
+      '<span class="tag '+sc+'">'+status+'</span>'+
+      '<span style="font-size:.72rem;color:var(--text-3)">'+date+'</span>'+
+      '</span></div>';
+  }).join('')+'</div>';
+}
+
+function expandableBreakdownTable(currRows,col1,prevTicketsFn,fieldMap){
+  if(!currRows.length)return'<div class="empty-state" style="padding:16px"><div class="empty-state-msg">No tickets matched</div></div>';
+  const hasPrev=!!prevTicketsFn;
+  const cols=6+(hasPrev?2:0);
+  let html='<div class="data-table-wrap"><table class="data-table"><thead><tr>'+
+    '<th>'+esc(col1)+' <span style="font-size:.6rem;opacity:.45;font-weight:400">▸ click row to expand</span></th><th>Count</th>'+
+    (hasPrev?'<th style="color:var(--text-3)">Prev</th><th>Δ</th>':'')+
+    '<th>Open</th><th>Closed</th><th>Pending</th><th>Avg Res.</th></tr></thead><tbody>';
+  let gt=0,gtp=0;
+  currRows.forEach(([label,tickets])=>{
+    const sc=statusCounts(tickets);
+    const avg=avgResHours(tickets);
+    gt+=tickets.length;
+    let prevCount='',chip='';
+    if(hasPrev){const pTix=prevTicketsFn(label);prevCount=pTix.length;gtp+=prevCount;chip=deltaChip(tickets.length,prevCount,true);}
+    const did='dr'+(++_drillId);
+    html+='<tr class="drill-row-hdr" data-drill-id="'+did+'">'+
+      '<td>'+esc(label)+'<span class="drill-arrow" id="darr-'+did+'">▸</span></td>'+
+      '<td style="font-weight:600">'+tickets.length+'</td>'+
+      (hasPrev?'<td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+prevCount+'</td><td style="text-align:right">'+chip+'</td>':'')+
+      '<td><span class="tag tag-open">'+sc.open+'</span></td>'+
+      '<td><span class="tag tag-closed">'+sc.closed+'</span></td>'+
+      '<td><span class="tag tag-pending">'+sc.pending+'</span></td>'+
+      '<td>'+(avg!==null?avg+'h':'—')+'</td></tr>'+
+      '<tr class="drill-content" id="dcnt-'+did+'"><td colspan="'+cols+'" style="padding:0">'+ticketDrillHtml(tickets,fieldMap)+'</td></tr>';
   });
   html+='</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+gt+'</td>'+
     (hasPrev?'<td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+gtp+'</td><td style="text-align:right">'+deltaChip(gt,gtp,true)+'</td>':'')+
@@ -2002,6 +2067,96 @@ function renderPinball(){
 }
 
 function showSection(name){document.querySelectorAll('.section-view').forEach(el=>el.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(el=>el.classList.remove('active'));document.getElementById('section-'+name).classList.add('active');document.querySelector('.nav-item[data-section="'+name+'"]').classList.add('active');}
+
+// ── Kegerators ────────────────────────────────────────────────
+function renderKegerators(){
+  const{tickets,ticketsPrev,fieldMap}=state;
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const total=tickets.length;
+  const kegT=tickets.filter(t=>matchesValue(getFieldById(t,pid),'Kegerator'));
+  const kegPrev=ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),'Kegerator'));
+  document.getElementById('badge-kegerator').textContent=kegT.length;
+  const byR=sortedEntries(groupBy(kegT,t=>getFieldById(t,rid)));
+  const prevByR=groupBy(kegPrev,t=>getFieldById(t,rid));
+  const sc=statusCounts(kegT);const avg=avgResHours(kegT);
+  let html='<div class="page-header"><div><div class="page-title" style="color:var(--amber)">🍺 Kegerators</div><div class="page-subtitle">All Kegerator variants — ticket breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  html+=sectionBlock({
+    title:'Kegerators <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+kegT.length+'</span> '+deltaChip(kegT.length,kegPrev.length,true),
+    subtitle:kegT.length+' tickets · prev: '+kegPrev.length+' · '+pct(kegT.length,total)+' of all',
+    dot:'dot-amber',
+    summaryItems:[
+      {val:kegT.length,label:'Total',color:'var(--text-1)'},
+      {val:sc.open,label:'Open',color:'var(--amber)'},
+      {val:sc.closed,label:'Closed',color:'var(--green)'},
+      {val:sc.pending,label:'Pending',color:'var(--purple)'},
+      {val:avg?avg+'h':'—',label:'Avg Res.'},
+      {val:deltaChip(kegT.length,kegPrev.length,true)||'—',label:'vs Prev'},
+    ],
+    bodyHtml:expandableBreakdownTable(byR,'Contact Reason',label=>(prevByR[label]||[]),fieldMap)
+  });
+  document.getElementById('kegerator-content').innerHTML=html;
+}
+
+// ── LED Bar Signs ─────────────────────────────────────────────
+function renderLEDBars(){
+  const{tickets,ticketsPrev,fieldMap}=state;
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const total=tickets.length;
+  const ledT=tickets.filter(t=>matchesValue(getFieldById(t,pid),'LED Bar Sign'));
+  const ledPrev=ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),'LED Bar Sign'));
+  document.getElementById('badge-ledsigns').textContent=ledT.length;
+  const byR=sortedEntries(groupBy(ledT,t=>getFieldById(t,rid)));
+  const prevByR=groupBy(ledPrev,t=>getFieldById(t,rid));
+  const sc=statusCounts(ledT);const avg=avgResHours(ledT);
+  let html='<div class="page-header"><div><div class="page-title" style="color:var(--cyan)">💡 LED Bar Signs</div><div class="page-subtitle">LED Bar Sign tickets — breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  html+=sectionBlock({
+    title:'LED Bar Signs <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+ledT.length+'</span> '+deltaChip(ledT.length,ledPrev.length,true),
+    subtitle:ledT.length+' tickets · prev: '+ledPrev.length+' · '+pct(ledT.length,total)+' of all',
+    dot:'dot-cyan',
+    summaryItems:[
+      {val:ledT.length,label:'Total',color:'var(--text-1)'},
+      {val:sc.open,label:'Open',color:'var(--amber)'},
+      {val:sc.closed,label:'Closed',color:'var(--green)'},
+      {val:sc.pending,label:'Pending',color:'var(--purple)'},
+      {val:avg?avg+'h':'—',label:'Avg Res.'},
+      {val:deltaChip(ledT.length,ledPrev.length,true)||'—',label:'vs Prev'},
+    ],
+    bodyHtml:expandableBreakdownTable(byR,'Contact Reason',label=>(prevByR[label]||[]),fieldMap)
+  });
+  document.getElementById('ledsigns-content').innerHTML=html;
+}
+
+// ── Bar Fridges ───────────────────────────────────────────────
+function renderBarFridges(){
+  const{tickets,ticketsPrev,fieldMap}=state;
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const total=tickets.length;
+  const barT=tickets.filter(t=>matchesValue(getFieldById(t,pid),'Bar Fridge'));
+  const barPrev=ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),'Bar Fridge'));
+  document.getElementById('badge-barfridge').textContent=barT.length;
+  const byR=sortedEntries(groupBy(barT,t=>getFieldById(t,rid)));
+  const prevByR=groupBy(barPrev,t=>getFieldById(t,rid));
+  const sc=statusCounts(barT);const avg=avgResHours(barT);
+  let html='<div class="page-header"><div><div class="page-title" style="color:var(--blue)">🧊 Bar Fridges</div><div class="page-subtitle">Bar Fridge tickets — breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  html+=sectionBlock({
+    title:'Bar Fridges <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+barT.length+'</span> '+deltaChip(barT.length,barPrev.length,true),
+    subtitle:barT.length+' tickets · prev: '+barPrev.length+' · '+pct(barT.length,total)+' of all',
+    dot:'dot-blue',
+    summaryItems:[
+      {val:barT.length,label:'Total',color:'var(--text-1)'},
+      {val:sc.open,label:'Open',color:'var(--amber)'},
+      {val:sc.closed,label:'Closed',color:'var(--green)'},
+      {val:sc.pending,label:'Pending',color:'var(--purple)'},
+      {val:avg?avg+'h':'—',label:'Avg Res.'},
+      {val:deltaChip(barT.length,barPrev.length,true)||'—',label:'vs Prev'},
+    ],
+    bodyHtml:expandableBreakdownTable(byR,'Contact Reason',label=>(prevByR[label]||[]),fieldMap)
+  });
+  document.getElementById('barfridge-content').innerHTML=html;
+}
 
 // ── AI Insights ───────────────────────────────────────────────
 function renderAIReport(){
