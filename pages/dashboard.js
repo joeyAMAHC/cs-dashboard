@@ -1844,7 +1844,7 @@ function renderPool(){
         {val:avg?avg+'h':'—',label:'Avg Res.'},
         {val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'},
       ],
-      bodyHtml:breakdownTable(byD,'Damage Type',label=>(prevByD[label]||[]))
+      bodyHtml:expandableBreakdownTable(byD,'Damage Type',label=>(prevByD[label]||[]),fieldMap)
     });
   });
   html+=renderExtraBlocks('pool');
@@ -1875,14 +1875,14 @@ function renderArcade(){
     const prevByI=groupBy(prev,t=>getFieldById(t,aid));
     html+=sectionBlock({title:esc(product)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length+' · Contact Reason: '+ARCADE_REASON,dot,
       summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
-      bodyHtml:breakdownTable(byI,'Issue / Damage Type',label=>(prevByI[label]||[]))});
+      bodyHtml:expandableBreakdownTable(byI,'Issue / Damage Type',label=>(prevByI[label]||[]),fieldMap)});
   });
   const scAll2=statusCounts(allArcade);const avgAll=avgResHours(allArcade);
   const byIA=sortedEntries(groupBy(allArcade,t=>getFieldById(t,aid)));
   const prevByIA=groupBy(allArcadePrev,t=>getFieldById(t,aid));
   html+=sectionBlock({title:'All Arcade Machines — Combined <span style="font-size:.8rem;font-weight:400">'+allArcade.length+'</span> '+deltaChip(allArcade.length,allArcadePrev.length,true),dot:'dot-red',borderColor:'rgba(255,86,85,.3)',headerBg:'var(--red-soft)',
     summaryItems:[{val:allArcade.length,label:'Total'},{val:scAll2.open,label:'Open',color:'var(--amber)'},{val:scAll2.closed,label:'Closed',color:'var(--green)'},{val:scAll2.pending,label:'Pending',color:'var(--purple)'},{val:avgAll?avgAll+'h':'—',label:'Avg Res.'},{val:deltaChip(allArcade.length,allArcadePrev.length,true)||'—',label:'vs Prev'}],
-    bodyHtml:breakdownTable(byIA,'Issue / Damage Type',label=>(prevByIA[label]||[]))});
+    bodyHtml:expandableBreakdownTable(byIA,'Issue / Damage Type',label=>(prevByIA[label]||[]),fieldMap)});
   // ── Broken Games section ─────────────────────────────────
   const bgid=fieldMap[FIELD_NAMES.BROKEN_GAMES.toLowerCase()];
   const brokenTix=tickets.filter(t=>getFieldById(t,aid).toLowerCase()==='game not working');
@@ -1922,7 +1922,7 @@ function renderCourier(){
     const prevByC=groupBy(prev,t=>getFieldById(t,cid));
     html+=sectionBlock({title:esc(reason)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length,dot:dots[i],
       summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
-      bodyHtml:breakdownTable(byC,'Courier',label=>(prevByC[label]||[]))});
+      bodyHtml:expandableBreakdownTable(byC,'Courier',label=>(prevByC[label]||[]),fieldMap)});
   });
   const scAllC=statusCounts(allC);const avgAllC=avgResHours(allC);
   const byCAll=sortedEntries(groupBy(allC,t=>getFieldById(t,cid)));
@@ -1930,7 +1930,7 @@ function renderCourier(){
   const worst=byCAll[0]?.[0]||'—';
   html+=sectionBlock({title:'Total Courier Issues — All Reasons <span style="font-size:.8rem;font-weight:400">'+allC.length+'</span> '+deltaChip(allC.length,allCPrev.length,true),subtitle:'Worst offender: <strong>'+esc(worst)+'</strong>',dot:'dot-blue',borderColor:'rgba(79,142,255,.25)',headerBg:'var(--blue-soft)',
     summaryItems:[{val:allC.length,label:'Total'},{val:scAllC.open,label:'Open',color:'var(--amber)'},{val:scAllC.closed,label:'Closed',color:'var(--green)'},{val:scAllC.pending,label:'Pending',color:'var(--purple)'},{val:avgAllC?avgAllC+'h':'—',label:'Avg Res.'},{val:deltaChip(allC.length,allCPrev.length,true)||'—',label:'vs Prev'}],
-    bodyHtml:breakdownTable(byCAll,'Courier',label=>(prevByCAll[label]||[]))});
+    bodyHtml:expandableBreakdownTable(byCAll,'Courier',label=>(prevByCAll[label]||[]),fieldMap)});
   html+=renderExtraBlocks('courier');
   document.getElementById('courier-content').innerHTML=html;
 }
@@ -1965,7 +1965,7 @@ function renderOps(){
     const prevByP=groupBy(prev,t=>getFieldById(t,pid));
     html+=sectionBlock({title:esc(reason)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all',dot:dots[i],
       summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
-      bodyHtml:breakdownTable(byP,'Product',label=>(prevByP[label]||[]))});
+      bodyHtml:expandableBreakdownTable(byP,'Product',label=>(prevByP[label]||[]),fieldMap)});
   });
   html+=renderExtraBlocks('ops');
   document.getElementById('ops-content').innerHTML=html;
