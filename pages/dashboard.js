@@ -387,6 +387,7 @@ function SettingsPanel({ onClose, authFetch, onSave }) {
     { key: 'RESOLUTION', label: 'Resolution field' },
     { key: 'REFUND_VALUE', label: 'Refund Value field' },
     { key: 'ORDER_NUMBER', label: 'Order Number field' },
+    { key: 'KEG_MISSING_ITEM', label: 'Kegerator Missing Item field' },
   ]
 
   const iStyle = { background: 'var(--bg-elevated)', border: '1px solid var(--border)', color: 'var(--text-1)', borderRadius: 6, padding: '7px 10px', fontFamily: 'var(--font-body)', fontSize: '.85rem', outline: 'none', width: '100%' }
@@ -1384,9 +1385,9 @@ table.csa-table{width:100%;border-collapse:collapse;font-size:.85rem}table.csa-t
 `
 
 // ── Config — reads from window.__dashConfig (set by SettingsPanel) with fallbacks ──
-const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},kegerator:{products:['Gen 2.0']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
-let FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,KEG_PRODUCTS,COURIER_REASONS,OPS_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
-function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER};POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;KEG_PRODUCTS=(c.kegerator&&c.kegerator.products)||_DC.kegerator.products;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
+const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number',KEG_MISSING_ITEM:'Kegerator Missing Item'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},kegerator:{products:['Gen 2.0']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
+let FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,KEG_PRODUCTS,KEG_MISSING_REASON,COURIER_REASONS,OPS_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
+function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER,KEG_MISSING_ITEM:fn.KEG_MISSING_ITEM||_DC.fieldNames.KEG_MISSING_ITEM};KEG_MISSING_REASON=(c.kegerator&&c.kegerator.missingReason)||'Item Missing::Supplier Fault';POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;KEG_PRODUCTS=(c.kegerator&&c.kegerator.products)||_DC.kegerator.products;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
 // ── Collapsible blocks ───────────────────────────────────────
 let collapseState={};
 function toggleBlock(id){
@@ -2073,6 +2074,7 @@ function renderKegerators(){
   const{tickets,ticketsPrev,fieldMap}=state;
   const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const kmid=fieldMap[(FIELD_NAMES.KEG_MISSING_ITEM||'').toLowerCase()];
   const total=tickets.length;
   const kegT=tickets.filter(t=>KEG_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p)));
   const kegPrev=ticketsPrev.filter(t=>KEG_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p)));
@@ -2080,7 +2082,12 @@ function renderKegerators(){
   const byR=sortedEntries(groupBy(kegT,t=>getFieldById(t,rid)));
   const prevByR=groupBy(kegPrev,t=>getFieldById(t,rid));
   const sc=statusCounts(kegT);const avg=avgResHours(kegT);
-  let html='<div class="page-header"><div><div class="page-title" style="color:var(--amber)">🍺 Kegerators</div><div class="page-subtitle">All Kegerator variants — ticket breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  // Missing items — supplier fault
+  const missingT=kegT.filter(t=>matchesValue(getFieldById(t,rid),KEG_MISSING_REASON));
+  const missingPrev=kegPrev.filter(t=>matchesValue(getFieldById(t,rid),KEG_MISSING_REASON));
+  const byMissing=kmid?sortedEntries(groupBy(missingT,t=>getFieldById(t,kmid))):[];
+  const prevByMissing=kmid?groupBy(missingPrev,t=>getFieldById(t,kmid)):{};
+  let html='<div class="page-header"><div><div class="page-title" style="color:var(--amber)">🍺 Kegerators</div><div class="page-subtitle">Gen 2.0 — ticket breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   html+=sectionBlock({
     title:'Kegerators <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+kegT.length+'</span> '+deltaChip(kegT.length,kegPrev.length,true),
     subtitle:kegT.length+' tickets · prev: '+kegPrev.length+' · '+pct(kegT.length,total)+' of all',
@@ -2095,6 +2102,25 @@ function renderKegerators(){
     ],
     bodyHtml:expandableBreakdownTable(byR,'Contact Reason',label=>(prevByR[label]||[]),fieldMap)
   });
+  if(missingT.length>0||missingPrev.length>0){
+    const msc=statusCounts(missingT);const mavg=avgResHours(missingT);
+    html+=sectionBlock({
+      title:'Missing Items — Supplier Fault <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+missingT.length+'</span> '+deltaChip(missingT.length,missingPrev.length,true),
+      subtitle:missingT.length+' tickets · prev: '+missingPrev.length+' — breakdown by missing item reported',
+      dot:'dot-red',
+      summaryItems:[
+        {val:missingT.length,label:'Total',color:'var(--text-1)'},
+        {val:msc.open,label:'Open',color:'var(--amber)'},
+        {val:msc.closed,label:'Closed',color:'var(--green)'},
+        {val:msc.pending,label:'Pending',color:'var(--purple)'},
+        {val:mavg?mavg+'h':'—',label:'Avg Res.'},
+        {val:deltaChip(missingT.length,missingPrev.length,true)||'—',label:'vs Prev'},
+      ],
+      bodyHtml:byMissing.length>0
+        ?expandableBreakdownTable(byMissing,'Missing Item',label=>(prevByMissing[label]||[]),fieldMap)
+        :'<div style="padding:12px;color:var(--text-3);font-size:.85rem">'+(kmid?'No missing item detail recorded on these tickets.':'Map the <strong>Kegerator Missing Item</strong> field in Settings to see the breakdown.')+'</div>'
+    });
+  }
   document.getElementById('kegerator-content').innerHTML=html;
 }
 
