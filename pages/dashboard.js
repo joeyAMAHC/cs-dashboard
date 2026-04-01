@@ -117,8 +117,8 @@ function ChatBot({ authPost }) {
   )
 
   return (
-    <div style={{ position: 'fixed', bottom: 28, right: 28, width: 380, height: 530, background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,.45)', display: 'flex', flexDirection: 'column', zIndex: 9999, overflow: 'hidden' }}>
-      <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-2)', flexShrink: 0 }}>
+    <div style={{ position: 'fixed', bottom: 28, right: 28, width: 380, height: 530, background: 'var(--bg-canvas)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,.7)', display: 'flex', flexDirection: 'column', zIndex: 9999, overflow: 'hidden' }}>
+      <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-elevated)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <span style={{ fontSize: '1.1rem' }}>🤖</span>
           <div>
@@ -135,24 +135,24 @@ function ChatBot({ authPost }) {
           </div>
         )}
         {messages.map((m, i) => (
-          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%', background: m.role === 'user' ? 'linear-gradient(135deg,#4f8eff,#6366f1)' : 'var(--bg-2)', color: m.role === 'user' ? '#fff' : 'var(--text-1)', padding: '9px 13px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', fontSize: '.84rem', lineHeight: 1.55, border: m.role === 'assistant' ? '1px solid var(--border)' : 'none', whiteSpace: 'pre-wrap' }}>
+          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%', background: m.role === 'user' ? 'linear-gradient(135deg,#4f8eff,#6366f1)' : 'var(--bg-elevated)', color: m.role === 'user' ? '#fff' : 'var(--text-1)', padding: '9px 13px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', fontSize: '.84rem', lineHeight: 1.55, border: m.role === 'assistant' ? '1px solid var(--border)' : 'none', whiteSpace: 'pre-wrap' }}>
             {m.content}
           </div>
         ))}
         {loading && (
-          <div style={{ alignSelf: 'flex-start', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '14px 14px 14px 4px', padding: '9px 13px', fontSize: '.84rem', color: 'var(--text-3)' }}>
+          <div style={{ alignSelf: 'flex-start', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: '14px 14px 14px 4px', padding: '9px 13px', fontSize: '.84rem', color: 'var(--text-3)' }}>
             Thinking…
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
-      <div style={{ padding: '11px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, background: 'var(--bg-2)', flexShrink: 0 }}>
+      <div style={{ padding: '11px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, background: 'var(--bg-elevated)', flexShrink: 0 }}>
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
           placeholder="Ask about your tickets…"
-          style={{ flex: 1, padding: '8px 11px', borderRadius: 8, background: 'var(--bg-1)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '.84rem', outline: 'none' }}
+          style={{ flex: 1, padding: '8px 11px', borderRadius: 8, background: 'var(--bg-canvas)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '.84rem', outline: 'none' }}
         />
         <button onClick={sendMessage} disabled={loading || !input.trim()} style={{ padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#4f8eff,#6366f1)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '.84rem', fontWeight: 600, opacity: (loading || !input.trim()) ? 0.5 : 1 }}>
           Send
