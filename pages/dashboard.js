@@ -192,6 +192,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
     window.__generateAIReport = generateAIReport
     window.__loadCsAgent = loadCsAgent
     window.__buildTicketSummary = buildTicketSummary
+    window.__generateOpsReport = generateOpsReport
 
     return () => {
       delete window.__authFetch
@@ -204,6 +205,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
       delete window.__generateAIReport
       delete window.__loadCsAgent
       delete window.__buildTicketSummary
+      delete window.__generateOpsReport
       delete window.__state
     }
   }, [])
@@ -325,6 +327,9 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
             ))}
           </>}
           <div className="nav-section-label" style={{ marginTop: 12 }}>Analysis</div>
+          <div className="nav-item" data-section="ops-report" onClick={() => window.__showSection('ops-report')}>
+            <span className="nav-icon">📋</span> Ops Report
+          </div>
           <div className="nav-item" data-section="comparison" onClick={() => window.__showSection('comparison')}>
             <span className="nav-icon">📅</span> MoM Comparison
           </div>
@@ -371,6 +376,12 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
               </div>
             </div>
           ))}
+
+          <div id="section-ops-report" className="section-view">
+            <div id="ops-report-content">
+              <div className="empty-state"><div className="empty-state-msg">Run the report first, then generate the Ops Report</div></div>
+            </div>
+          </div>
 
           <div id="section-comparison" className="section-view">
             <ComparisonSection authFetch={authFetch} />
@@ -1748,7 +1759,7 @@ function renderCustomSections(){
 
 function renderAll(){
   loadConfig();
-  renderOverview();renderPool();renderArcade();renderPinball();renderKegerators();renderLEDBars();renderBarFridges();renderCourier();renderOps();renderRefunds();renderCustomSections();updateBadges();
+  renderOverview();renderPool();renderArcade();renderPinball();renderKegerators();renderLEDBars();renderBarFridges();renderCourier();renderOps();renderRefunds();renderCustomSections();renderOpsReport();updateBadges();
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
   // Wire up collapsible block headers + agent filter chips via event delegation
@@ -2440,6 +2451,146 @@ function buildTicketSummary(){
     topContactReasons:topReasons,
     topProducts:topProducts,
   };
+}
+
+function buildOpsReportSummary(){
+  const s=state;
+  const{tickets,ticketsPrev,fieldMap}=s;
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const did=fieldMap[FIELD_NAMES.DAMAGE.toLowerCase()];
+  const resfid=fieldMap[FIELD_NAMES.RESOLUTION.toLowerCase()];
+  const rvfid=fieldMap[FIELD_NAMES.REFUND_VALUE.toLowerCase()];
+  const cid=fieldMap[(FIELD_NAMES.COURIER||'courier').toLowerCase()];
+
+  function avgResHrs(tix){
+    const cl=tix.filter(t=>t.status==='closed'&&t.created_datetime&&t.closed_datetime);
+    if(!cl.length)return null;
+    const tot=cl.reduce((s,t)=>s+(new Date(t.closed_datetime)-new Date(t.created_datetime))/3600000,0);
+    return Math.round(tot/cl.length*10)/10;
+  }
+
+  // Per-product breakdown
+  const allProds=[...new Set(tickets.map(t=>getFieldById(t,pid)).filter(p=>p&&p!=='Not Set'))];
+  const productBreakdown=allProds.map(prod=>{
+    const tix=tickets.filter(t=>getFieldById(t,pid)===prod);
+    const reasonMap={};
+    tix.forEach(t=>{const r=getFieldById(t,rid)||'Unknown';reasonMap[r]=(reasonMap[r]||0)+1;});
+    const topReasons=Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([r,c])=>({reason:r,count:c}));
+    return{product:prod,count:tix.length,avgResolutionHours:avgResHrs(tix),openCount:tix.filter(t=>t.status==='open'||t.status==='new').length,topReasons};
+  }).sort((a,b)=>b.count-a.count).slice(0,12);
+
+  // Resolution time by category
+  const courierTix=tickets.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const opsTix=tickets.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const poolTix=tickets.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
+  const arcadeTix=tickets.filter(t=>ARCADE_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p)));
+  const pinballTix=tickets.filter(t=>KELVIN_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p)));
+  const refundTix=tickets.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const replTix=tickets.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const resolutionByCategory=[
+    {category:'Pool Tables',ticketCount:poolTix.length,avgResolutionHours:avgResHrs(poolTix),openCount:poolTix.filter(t=>t.status==='open').length},
+    {category:'Arcade Machines',ticketCount:arcadeTix.length,avgResolutionHours:avgResHrs(arcadeTix),openCount:arcadeTix.filter(t=>t.status==='open').length},
+    {category:'Pinball / Gearshift',ticketCount:pinballTix.length,avgResolutionHours:avgResHrs(pinballTix),openCount:pinballTix.filter(t=>t.status==='open').length},
+    {category:'Courier Issues',ticketCount:courierTix.length,avgResolutionHours:avgResHrs(courierTix),openCount:courierTix.filter(t=>t.status==='open').length},
+    {category:'Ops Issues',ticketCount:opsTix.length,avgResolutionHours:avgResHrs(opsTix),openCount:opsTix.filter(t=>t.status==='open').length},
+    {category:'Refunds',ticketCount:refundTix.length,avgResolutionHours:avgResHrs(refundTix),openCount:refundTix.filter(t=>t.status==='open').length},
+  ].filter(c=>c.ticketCount>0).sort((a,b)=>(b.avgResolutionHours||0)-(a.avgResolutionHours||0));
+
+  // Courier breakdown
+  const courierByReason={};
+  courierTix.forEach(t=>{const r=getFieldById(t,rid)||'Unknown';courierByReason[r]=(courierByReason[r]||0)+1;});
+  const courierByName={};
+  if(cid){courierTix.forEach(t=>{const c=getFieldById(t,cid)||'Unknown';if(!courierByName[c])courierByName[c]={count:0,issues:{}};courierByName[c].count++;const r=getFieldById(t,rid)||'Unknown';courierByName[c].issues[r]=(courierByName[c].issues[r]||0)+1;});}
+
+  // Supplier damage breakdown
+  const supplierTix=tickets.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  const damageByType={};
+  supplierTix.forEach(t=>{const d=getFieldById(t,did)||'Not Specified';damageByType[d]=(damageByType[d]||0)+1;});
+  const supplierByProduct={};
+  supplierTix.forEach(t=>{const p=getFieldById(t,pid)||'Unknown';supplierByProduct[p]=(supplierByProduct[p]||0)+1;});
+
+  // Refund financials
+  const totalRefundVal=sumMoney(refundTix,rvfid);
+  const refundByProduct={};
+  refundTix.forEach(t=>{const p=getFieldById(t,pid)||'Unknown';if(!refundByProduct[p])refundByProduct[p]={count:0,value:0};refundByProduct[p].count++;refundByProduct[p].value+=fmtMoney(getFieldById(t,rvfid))||0;});
+
+  // Prev period totals
+  const prevCourierTix=ticketsPrev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const prevSupplierTix=ticketsPrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  const prevRefundTix=ticketsPrev.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const prevRefundVal=sumMoney(prevRefundTix,rvfid);
+
+  return{
+    period:{label:getPeriodLabel(),previousLabel:s.prevLabel},
+    totals:{current:tickets.length,previous:ticketsPrev.length,changePct:ticketsPrev.length?Math.round((tickets.length-ticketsPrev.length)/ticketsPrev.length*100):null},
+    productBreakdown,
+    resolutionByCategory,
+    courierIssues:{
+      total:courierTix.length,previousTotal:prevCourierTix.length,
+      byReason:Object.entries(courierByReason).sort((a,b)=>b[1]-a[1]).map(([r,c])=>({reason:r,count:c,avgResHours:avgResHrs(courierTix.filter(t=>matchesValue(getFieldById(t,rid),r)))})),
+      byCourier:Object.entries(courierByName).sort((a,b)=>b[1].count-a[1].count).map(([name,d])=>({courier:name,count:d.count,topIssues:Object.entries(d.issues).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([issue,count])=>({issue,count}))})),
+    },
+    supplierDamage:{
+      total:supplierTix.length,previousTotal:prevSupplierTix.length,
+      byDamageType:Object.entries(damageByType).sort((a,b)=>b[1]-a[1]).map(([type,count])=>({type,count})),
+      byProduct:Object.entries(supplierByProduct).sort((a,b)=>b[1]-a[1]).map(([product,count])=>({product,count})),
+    },
+    refunds:{
+      totalTickets:refundTix.length,previousTotal:prevRefundTix.length,
+      totalValue:totalRefundVal,previousValue:prevRefundVal,
+      replacements:replTix.length,
+      byProduct:Object.entries(refundByProduct).sort((a,b)=>b[1].value-a[1].value).map(([product,d])=>({product,tickets:d.count,value:d.value})),
+    },
+  };
+}
+
+async function generateOpsReport(){
+  const btn=document.getElementById('ops-gen-btn');
+  const el=document.getElementById('ops-report-content');
+  if(!state||!state.hasData){alert('Please run the report first.');return;}
+  const periodLabel=getPeriodLabel();
+  btn.disabled=true;
+  el.innerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#22c55e,#4f8eff);-webkit-background-clip:text;-webkit-text-fill-color:transparent">📋 Ops Report</div><div class="page-subtitle">Generating your operational analysis…</div></div><div class="period-badge">'+periodLabel+'</div></div>'+
+    '<div class="section-block" style="border-color:rgba(79,142,255,.3)"><div class="section-block-body" style="padding:28px"><div class="ai-thinking"><div class="spin"></div> Building report from '+state.tickets.length+' tickets — this takes about 15 seconds…</div></div></div>';
+  try{
+    const summary=buildOpsReportSummary();
+    const res=await window.__authPost('/api/ops-report',{summary});
+    if(res.error)throw new Error(res.error);
+    const html=markdownToHtml(res.report||'');
+    el.innerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#22c55e,#4f8eff);-webkit-background-clip:text;-webkit-text-fill-color:transparent">📋 Ops Report</div>'+
+      '<div class="page-subtitle">Operational analysis for the operations manager — generated '+new Date(res.generatedAt).toLocaleString('en-AU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</div></div>'+
+      '<div class="period-badge">'+periodLabel+'</div></div>'+
+      '<div class="section-block" style="border-color:rgba(79,142,255,.25)">'+
+      '<div class="section-block-body" style="padding:28px;max-width:820px"><div class="ai-report-body">'+html+'</div></div></div>'+
+      '<div style="margin-top:16px;display:flex;gap:10px">'+
+      '<button class="btn btn-primary" onclick="window.print()" style="gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> Export PDF</button>'+
+      '<button class="btn btn-ghost" onclick="window.__generateOpsReport()" style="gap:6px">↻ Regenerate</button>'+
+      '</div>';
+  }catch(e){
+    el.innerHTML='<div class="section-block" style="border-color:rgba(255,86,85,.3)"><div class="section-block-body" style="padding:28px"><div style="color:var(--red)">⚠️ '+esc(e.message)+'</div></div></div>';
+  }
+  btn.disabled=false;
+}
+
+function renderOpsReport(){
+  const el=document.getElementById('ops-report-content');
+  if(!el)return;
+  if(!state.hasData){
+    el.innerHTML='<div class="empty-state"><div class="empty-state-msg">Run the report first, then generate the Ops Report</div></div>';
+    return;
+  }
+  const periodLabel=getPeriodLabel();
+  el.innerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#22c55e,#4f8eff);-webkit-background-clip:text;-webkit-text-fill-color:transparent">📋 Ops Report</div>'+
+    '<div class="page-subtitle">AI-generated report for the operations manager — supplier quality, courier performance, resolution time &amp; refund cost</div></div>'+
+    '<div class="period-badge">'+periodLabel+'</div></div>'+
+    '<div class="section-block" style="border-color:rgba(79,142,255,.25)"><div class="section-block-body" style="padding:32px;text-align:center">'+
+    '<div style="font-size:2rem;margin-bottom:12px">📋</div>'+
+    '<div style="font-weight:600;font-size:1rem;color:var(--text-1);margin-bottom:8px">Ready to generate</div>'+
+    '<div style="color:var(--text-3);font-size:.85rem;margin-bottom:24px">'+state.tickets.length+' tickets loaded · '+periodLabel+'</div>'+
+    '<button id="ops-gen-btn" class="btn btn-primary" style="padding:10px 28px;font-size:.95rem" onclick="window.__generateOpsReport()">'+
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg> Generate Ops Report</button>'+
+    '</div></div>';
 }
 
 async function generateAIReport(){
