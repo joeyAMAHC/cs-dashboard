@@ -2151,6 +2151,16 @@ function renderRefunds(){
   const rvfid=fieldMap[FIELD_NAMES.REFUND_VALUE.toLowerCase()];
   const onfid=fieldMap[FIELD_NAMES.ORDER_NUMBER.toLowerCase()];
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const did=fieldMap[FIELD_NAMES.DAMAGE.toLowerCase()];
+  const aid=fieldMap[FIELD_NAMES.ARCADE_ISSUE.toLowerCase()];
+  const pfid=fieldMap[FIELD_NAMES.PINBALL_ISSUE.toLowerCase()];
+  // Returns the most specific damage/issue field that has a value for this ticket
+  function getDamageOrIssue(t){
+    const d=getFieldById(t,did);if(d&&d!=='Not Set')return d;
+    const a=getFieldById(t,aid);if(a&&a!=='Not Set')return a;
+    const p=getFieldById(t,pfid);if(p&&p!=='Not Set')return p;
+    return'—';
+  }
   const total=tickets.length;
   const refundTix=tickets.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   const refundPrev=ticketsPrev.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
@@ -2179,7 +2189,26 @@ function renderRefunds(){
   const byProdRepl=sortedEntries(groupBy(replTix,t=>getFieldById(t,pid)));
   const replRows=byProdRepl.map(([prod,tix])=>{const u=tix.filter(t=>getFieldById(t,resfid).toLowerCase()==='free product upgrade').length;const g=tix.filter(t=>getFieldById(t,resfid).toLowerCase()==='free gift').length;const r=tix.filter(t=>getFieldById(t,resfid).toLowerCase()==='replacement sent').length;return'<tr><td>'+esc(prod)+'</td><td>'+tix.length+'</td><td>'+u+'</td><td>'+g+'</td><td>'+r+'</td></tr>';}).join('');
   const refTicketRows=[...refundTix].sort((a,b)=>new Date(b.created_datetime)-new Date(a.created_datetime)).map(t=>{const res=getFieldById(t,resfid);const val=fmtMoney(getFieldById(t,rvfid));const valStr=val!==null?'<span class="val-chip">$'+val.toFixed(2)+'</span>':'—';const date=t.created_datetime?new Date(t.created_datetime).toLocaleDateString('en-AU'):'—';const rc=res.toLowerCase()==='refund'?'tag-open':'tag-pending';return'<tr><td>'+t.id+'</td><td>'+esc((t.customer?.name)||'Unknown')+'</td><td>'+esc(getFieldById(t,pid))+'</td><td><span class="tag '+rc+'">'+esc(res)+'</span></td><td>'+valStr+'</td><td><span class="tag '+(t.status==='closed'?'tag-closed':t.status==='pending'?'tag-pending':'tag-open')+'">'+t.status+'</span></td><td style="color:var(--text-2)">'+date+'</td></tr>';}).join('');
-  const replTicketRows=[...replTix].sort((a,b)=>new Date(b.created_datetime)-new Date(a.created_datetime)).map(t=>{const res=getFieldById(t,resfid);const order=getFieldById(t,onfid);const reason=getFieldById(t,rid);const rc=res.toLowerCase()==='replacement sent'?'tag-closed':res.toLowerCase()==='free product upgrade'?'tag-open':'tag-pending';return'<tr><td>'+t.id+'</td><td>'+esc((t.customer?.name)||'Unknown')+'</td><td>'+esc(getFieldById(t,pid))+'</td><td><span class="tag '+rc+'">'+esc(res)+'</span></td><td style="max-width:220px;white-space:normal;font-size:.78rem;color:var(--text-2)">'+esc(reason)+'</td><td style="font-family:var(--font-data);font-size:.75rem">'+esc(order)+'</td></tr>';}).join('');
+  const replTicketRows=[...replTix].sort((a,b)=>new Date(b.created_datetime)-new Date(a.created_datetime)).map(t=>{
+    const res=getFieldById(t,resfid);
+    const order=getFieldById(t,onfid);
+    const reason=getFieldById(t,rid);
+    const damageIssue=getDamageOrIssue(t);
+    const rc=res.toLowerCase()==='replacement sent'?'tag-closed':res.toLowerCase()==='free product upgrade'?'tag-open':'tag-pending';
+    const date=t.created_datetime?new Date(t.created_datetime).toLocaleDateString('en-AU'):'—';
+    const statusCls=t.status==='closed'?'tag-closed':t.status==='pending'?'tag-pending':'tag-open';
+    return'<tr>'+
+      '<td style="font-family:var(--font-data);font-size:.75rem;color:var(--blue)">'+esc(String(t.id))+'</td>'+
+      '<td>'+esc((t.customer?.name)||'Unknown')+'</td>'+
+      '<td>'+esc(getFieldById(t,pid))+'</td>'+
+      '<td><span class="tag '+rc+'">'+esc(res)+'</span></td>'+
+      '<td style="max-width:200px;white-space:normal;font-size:.78rem;color:var(--text-2)">'+esc(reason)+'</td>'+
+      '<td style="max-width:180px;white-space:normal;font-size:.78rem;font-weight:600;color:var(--amber)">'+esc(damageIssue)+'</td>'+
+      '<td style="font-family:var(--font-data);font-size:.75rem">'+esc(order!=='Not Set'?order:'—')+'</td>'+
+      '<td><span class="tag '+statusCls+'">'+esc(t.status)+'</span></td>'+
+      '<td style="color:var(--text-2);font-size:.78rem">'+date+'</td>'+
+      '</tr>';
+  }).join('');
   function statCardRef(label,curr,prev,val,cls,color,goodWhenDown=true){
     return'<div class="stat-card '+cls+'"><div class="stat-label">'+label+'</div><div class="stat-value '+color+'">'+curr+'</div><div class="stat-sub" style="display:flex;align-items:center;gap:6px">'+(val!==null?'<span>$'+val.toFixed(2)+'</span>·':'')+'<span style="color:var(--text-3)">prev: '+prev+'</span>'+deltaChip(curr,prev,goodWhenDown)+'</div></div>';
   }
@@ -2197,7 +2226,7 @@ function renderRefunds(){
     '<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-green"></span>Replacements by Product</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Total</th><th>Upgrades</th><th>Free Gifts</th><th>Replacements</th></tr></thead><tbody>'+replRows+'</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+replTix.length+'</td><td>'+freeU.length+'</td><td>'+freeG.length+'</td><td>'+replS.length+'</td></tr></tfoot></table></div></div></div>'+
     '</div>'+
     '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-red"></span>All Refund Tickets</div><div class="section-block-subtitle">'+refundTix.length+' tickets · newest first</div></div></div><div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Resolution</th><th>Value</th><th>Status</th><th>Date</th></tr></thead><tbody>'+refTicketRows+'</tbody></table></div></div></div></div>'+
-    '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-green"></span>All Replacement Tickets</div><div class="section-block-subtitle">'+replTix.length+' tickets · includes order numbers</div></div></div><div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Resolution</th><th>Contact Reason</th><th>Order No.</th></tr></thead><tbody>'+replTicketRows+'</tbody></table></div></div></div></div>';
+    '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-green"></span>All Replacement Tickets</div><div class="section-block-subtitle">'+replTix.length+' tickets · newest first</div></div></div><div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Resolution</th><th>Contact Reason</th><th style="color:var(--amber)">Damage / Issue</th><th>Order No.</th><th>Status</th><th>Date</th></tr></thead><tbody>'+replTicketRows+'</tbody></table></div></div></div></div>';
   html+=renderExtraBlocks('refunds');
   document.getElementById('refunds-content').innerHTML=html;
 }
