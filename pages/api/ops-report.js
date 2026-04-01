@@ -18,71 +18,59 @@ export default async function handler(req, res) {
   const { summary } = req.body
   if (!summary) return res.status(400).json({ error: 'No summary data provided' })
 
-  const prompt = `You are a senior operations analyst preparing a report for the Operations Manager of an Australian e-commerce company that sells entertainment products — pool tables, arcade machines, pinball machines, kegerators, bar fridges, and LED bar signs.
+  const prompt = `You are writing a short, direct operations report for an operations manager at an Australian e-commerce company selling pool tables, arcade machines, pinball machines, kegerators, bar fridges, and LED bar signs.
 
-Here is the structured data for the reporting period:
+The data below contains ONLY properly-tagged tickets — tickets missing a product or contact reason have already been excluded.
 
 ${JSON.stringify(summary, null, 2)}
 
-Produce a concise, structured Operations Report. No fluff. Every sentence must be backed by a number from the data. Use the exact structure below — do not add or remove sections.
+Write a concise operations report using ONLY the structure below. No introductions, no preamble, no commentary outside the sections. Every number must come directly from the data. Skip any section or product where the count is zero.
 
 ---
 
-## Operations Report — ${summary.period?.label || 'Current Period'}
-
-### Executive Summary
-3–4 sentences maximum. Lead with total ticket volume and direction vs prior period. Name the single biggest issue category and its financial or volume impact. End with the headline action required.
+## Ops Report — ${summary.period?.label || 'Current Period'}
+**${summary.totalTaggedTickets} tagged tickets** · vs prior period: ${summary.totalAllTickets !== summary.totalTaggedTickets ? `${summary.totalAllTickets} total (${summary.totalTaggedTickets} with full tagging)` : summary.totalTaggedTickets}
 
 ---
 
-### 1. Top Issues by Product Category
-For each product category that had tickets, list:
-- The category name and total ticket count
-- The top 3 contact reasons with counts
-- Average resolution time (hours) if available
-- One-line operational note if something stands out
+### Issues by Product
 
-Sort by ticket volume, highest first. Skip categories with zero tickets.
+For each product in byProduct (highest count first), write:
 
----
-
-### 2. What Is Taking the Most Time to Resolve
-List the top categories ranked by average resolution time (slowest first). For each:
-- Category, avg resolution hours, open ticket count
-- One-line note on why this might be slow (e.g. waiting on supplier, complex damage assessment, courier investigations)
+**[Product Name] — [count] tickets**
+- List each contact reason and its count, one bullet per reason
+- If damage types are available for this product, add a sub-list of damage types and counts
+- No extra commentary
 
 ---
 
-### 3. Courier Performance
-Total courier-related tickets and breakdown by issue type (missing, delayed, damaged, wrong address).
-If courier names are available, rank them by complaint volume.
-Call out any courier that stands out as a repeat offender.
-Specific recommendation: what action should ops take with the worst-performing courier?
+### Courier Issues
+
+Only include if courierIssues.total > 0.
+List each issue type and count. If courier names are available, rank them by complaint volume — one line per courier with their top issue.
 
 ---
 
-### 4. Supplier Quality
-Total supplier damage tickets and breakdown by damage type.
-Which damage types are recurring (appeared more than once)?
-Which product lines have the highest supplier damage rate?
-Specific recommendation: what packaging, QC, or supplier audit action is needed?
+### Supplier Damage
+
+Only include if supplierDamage.total > 0.
+List damage types and counts. Note which products are most affected.
 
 ---
 
-### 5. Refunds & Financial Impact
-- Total refund tickets and total refund value for the period
-- Breakdown by product: which products are costing the most in refunds
-- Replacement count vs refund count — is the team replacing too much or not enough?
-- Specific recommendation: where could refund spend be reduced through ops changes?
+### Refund Cost
+
+- Total refund tickets and total dollar value
+- List products with refund cost, highest first: Product — X tickets · $Y
+- Replacements sent: [count]
 
 ---
 
-### 6. Priority Actions This Week
-Exactly 5 numbered actions. Each must be specific and immediately actionable — not "improve quality" but "contact [courier/supplier] about [specific issue] — X tickets in [period]". Include the data point that justifies each action.
+### 3 Priority Actions
 
----
+Number them 1–3. Each must name a specific product, supplier, or courier and cite a number. Format: **[Action]** — [data justification]. Nothing vague.
 
-Keep language direct and professional. An operations manager should be able to read this in 5 minutes and walk into a supplier or courier meeting with specific talking points.`
+---`
 
   try {
     const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
@@ -94,7 +82,7 @@ Keep language direct and professional. An operations manager should be able to r
       },
       body: JSON.stringify({
         model: 'claude-haiku-4-5',
-        max_tokens: 3000,
+        max_tokens: 2000,
         messages: [{ role: 'user', content: prompt }],
       }),
     })

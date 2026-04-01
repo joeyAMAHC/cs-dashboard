@@ -2488,76 +2488,77 @@ function buildOpsReportSummary(){
   const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
   const did=fieldMap[FIELD_NAMES.DAMAGE.toLowerCase()];
+  const aid=fieldMap[FIELD_NAMES.ARCADE_ISSUE.toLowerCase()];
+  const pfid=fieldMap[FIELD_NAMES.PINBALL_ISSUE.toLowerCase()];
   const resfid=fieldMap[FIELD_NAMES.RESOLUTION.toLowerCase()];
   const rvfid=fieldMap[FIELD_NAMES.REFUND_VALUE.toLowerCase()];
-  const cid=fieldMap[(FIELD_NAMES.COURIER||'courier').toLowerCase()];
+  const cid=fieldMap[FIELD_NAMES.COURIER.toLowerCase()];
 
-  function avgResHrs(tix){
-    const cl=tix.filter(t=>t.status==='closed'&&t.created_datetime&&t.closed_datetime);
-    if(!cl.length)return null;
-    const tot=cl.reduce((s,t)=>s+(new Date(t.closed_datetime)-new Date(t.created_datetime))/3600000,0);
-    return Math.round(tot/cl.length*10)/10;
-  }
+  // Only tagged tickets: both Product AND Contact Reason must be set
+  const isTagged=t=>{
+    const p=getFieldById(t,pid);const r=getFieldById(t,rid);
+    return p&&p!=='Not Set'&&r&&r!=='Not Set';
+  };
+  const tagged=tickets.filter(isTagged);
+  const totalAllTickets=tickets.length;
+  const totalTaggedTickets=tagged.length;
 
-  // Per-product breakdown
-  const allProds=[...new Set(tickets.map(t=>getFieldById(t,pid)).filter(p=>p&&p!=='Not Set'))];
-  const productBreakdown=allProds.map(prod=>{
-    const tix=tickets.filter(t=>getFieldById(t,pid)===prod);
+  // Per-product breakdown (tagged only)
+  const allProds=[...new Set(tagged.map(t=>getFieldById(t,pid)).filter(Boolean))];
+  const byProduct=allProds.map(prod=>{
+    const tix=tagged.filter(t=>getFieldById(t,pid)===prod);
     const reasonMap={};
     tix.forEach(t=>{const r=getFieldById(t,rid)||'Unknown';reasonMap[r]=(reasonMap[r]||0)+1;});
-    const topReasons=Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([r,c])=>({reason:r,count:c}));
-    return{product:prod,count:tix.length,avgResolutionHours:avgResHrs(tix),openCount:tix.filter(t=>t.status==='open'||t.status==='new').length,topReasons};
-  }).sort((a,b)=>b.count-a.count).slice(0,12);
+    // Damage sub-breakdown: use whichever damage field is relevant and set
+    const dmgMap={};
+    tix.forEach(t=>{
+      const d=getFieldById(t,did);const a=getFieldById(t,aid);const pf=getFieldById(t,pfid);
+      const val=(d&&d!=='Not Set')?d:(a&&a!=='Not Set')?a:(pf&&pf!=='Not Set')?pf:null;
+      if(val){dmgMap[val]=(dmgMap[val]||0)+1;}
+    });
+    return{
+      product:prod,count:tix.length,
+      byReason:Object.entries(reasonMap).sort((a,b)=>b[1]-a[1]).map(([reason,count])=>({reason,count})),
+      byDamage:Object.keys(dmgMap).length?Object.entries(dmgMap).sort((a,b)=>b[1]-a[1]).map(([type,count])=>({type,count})):null,
+    };
+  }).sort((a,b)=>b.count-a.count);
 
-  // Resolution time by category
-  const courierTix=tickets.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
-  const opsTix=tickets.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
-  const poolTix=tickets.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
-  const arcadeTix=tickets.filter(t=>ARCADE_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p)));
-  const pinballTix=tickets.filter(t=>KELVIN_PRODUCTS.some(p=>matchesValue(getFieldById(t,pid),p)));
-  const refundTix=tickets.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
-  const replTix=tickets.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
-  const resolutionByCategory=[
-    {category:'Pool Tables',ticketCount:poolTix.length,avgResolutionHours:avgResHrs(poolTix),openCount:poolTix.filter(t=>t.status==='open').length},
-    {category:'Arcade Machines',ticketCount:arcadeTix.length,avgResolutionHours:avgResHrs(arcadeTix),openCount:arcadeTix.filter(t=>t.status==='open').length},
-    {category:'Pinball / Gearshift',ticketCount:pinballTix.length,avgResolutionHours:avgResHrs(pinballTix),openCount:pinballTix.filter(t=>t.status==='open').length},
-    {category:'Courier Issues',ticketCount:courierTix.length,avgResolutionHours:avgResHrs(courierTix),openCount:courierTix.filter(t=>t.status==='open').length},
-    {category:'Ops Issues',ticketCount:opsTix.length,avgResolutionHours:avgResHrs(opsTix),openCount:opsTix.filter(t=>t.status==='open').length},
-    {category:'Refunds',ticketCount:refundTix.length,avgResolutionHours:avgResHrs(refundTix),openCount:refundTix.filter(t=>t.status==='open').length},
-  ].filter(c=>c.ticketCount>0).sort((a,b)=>(b.avgResolutionHours||0)-(a.avgResolutionHours||0));
-
-  // Courier breakdown
+  // Courier breakdown (tagged)
+  const courierTix=tagged.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
   const courierByReason={};
   courierTix.forEach(t=>{const r=getFieldById(t,rid)||'Unknown';courierByReason[r]=(courierByReason[r]||0)+1;});
   const courierByName={};
   if(cid){courierTix.forEach(t=>{const c=getFieldById(t,cid)||'Unknown';if(!courierByName[c])courierByName[c]={count:0,issues:{}};courierByName[c].count++;const r=getFieldById(t,rid)||'Unknown';courierByName[c].issues[r]=(courierByName[c].issues[r]||0)+1;});}
 
-  // Supplier damage breakdown
-  const supplierTix=tickets.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  // Supplier damage (tagged)
+  const supplierTix=tagged.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
   const damageByType={};
   supplierTix.forEach(t=>{const d=getFieldById(t,did)||'Not Specified';damageByType[d]=(damageByType[d]||0)+1;});
   const supplierByProduct={};
   supplierTix.forEach(t=>{const p=getFieldById(t,pid)||'Unknown';supplierByProduct[p]=(supplierByProduct[p]||0)+1;});
 
-  // Refund financials
+  // Refund financials (tagged)
+  const refundTix=tagged.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  const replTix=tagged.filter(t=>REPLACEMENT_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   const totalRefundVal=sumMoney(refundTix,rvfid);
   const refundByProduct={};
   refundTix.forEach(t=>{const p=getFieldById(t,pid)||'Unknown';if(!refundByProduct[p])refundByProduct[p]={count:0,value:0};refundByProduct[p].count++;refundByProduct[p].value+=fmtMoney(getFieldById(t,rvfid))||0;});
 
-  // Prev period totals
-  const prevCourierTix=ticketsPrev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
-  const prevSupplierTix=ticketsPrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
-  const prevRefundTix=ticketsPrev.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
+  // Prev period (tagged)
+  const prevTagged=ticketsPrev.filter(isTagged);
+  const prevCourierTix=prevTagged.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
+  const prevSupplierTix=prevTagged.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  const prevRefundTix=prevTagged.filter(t=>REFUND_VALUES.some(v=>matchesValue(getFieldById(t,resfid),v)));
   const prevRefundVal=sumMoney(prevRefundTix,rvfid);
 
   return{
     period:{label:getPeriodLabel(),previousLabel:s.prevLabel},
-    totals:{current:tickets.length,previous:ticketsPrev.length,changePct:ticketsPrev.length?Math.round((tickets.length-ticketsPrev.length)/ticketsPrev.length*100):null},
-    productBreakdown,
-    resolutionByCategory,
+    totalAllTickets,totalTaggedTickets,
+    totals:{current:totalTaggedTickets,previous:prevTagged.length,changePct:prevTagged.length?Math.round((totalTaggedTickets-prevTagged.length)/prevTagged.length*100):null},
+    byProduct,
     courierIssues:{
       total:courierTix.length,previousTotal:prevCourierTix.length,
-      byReason:Object.entries(courierByReason).sort((a,b)=>b[1]-a[1]).map(([r,c])=>({reason:r,count:c,avgResHours:avgResHrs(courierTix.filter(t=>matchesValue(getFieldById(t,rid),r)))})),
+      byReason:Object.entries(courierByReason).sort((a,b)=>b[1]-a[1]).map(([r,c])=>({reason:r,count:c})),
       byCourier:Object.entries(courierByName).sort((a,b)=>b[1].count-a[1].count).map(([name,d])=>({courier:name,count:d.count,topIssues:Object.entries(d.issues).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([issue,count])=>({issue,count}))})),
     },
     supplierDamage:{
