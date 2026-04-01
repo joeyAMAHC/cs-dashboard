@@ -1954,38 +1954,56 @@ function renderPool(){
   const did=fieldMap[FIELD_NAMES.DAMAGE.toLowerCase()];
   const poolT=tickets.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
   const poolPrev=ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),POOL_PRODUCT));
-  const supT=poolT.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
-  const supPrev=poolPrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
-  const courT=poolT.filter(t=>matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
-  const courPrev=poolPrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
-  const allD=dedup([...supT,...courT]);
-  const allDPrev=dedup([...supPrev,...courPrev]);
+  // Use the Pool Table Damage field as the primary indicator — not just Contact Reason.
+  // This catches tickets where the agent recorded the correct damage type but used the
+  // wrong Contact Reason (e.g. WISMO instead of Item Damaged), which previously made
+  // them invisible to the stats.
+  const hasDamage=t=>{ const d=getFieldById(t,did); return d&&d!=='Not Set'; };
+  const poolDamageT=poolT.filter(hasDamage);
+  const poolDamagePrev=poolPrev.filter(hasDamage);
+  const supT=poolDamageT.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  const supPrev=poolDamagePrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
+  const courT=poolDamageT.filter(t=>matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
+  const courPrev=poolDamagePrev.filter(t=>matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
+  // Tickets with damage recorded but wrong Contact Reason — data quality flag for ops
+  const uncatT=poolDamageT.filter(t=>!matchesValue(getFieldById(t,rid),REASON_SUPPLIER)&&!matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
+  const uncatPrev=poolDamagePrev.filter(t=>!matchesValue(getFieldById(t,rid),REASON_SUPPLIER)&&!matchesValue(getFieldById(t,rid),REASON_COURIER_POOL));
+  const allD=poolDamageT;
+  const allDPrev=poolDamagePrev;
   const total=tickets.length;
   document.getElementById('badge-pool').textContent=allD.length;
   const sections=[
     {title:'Supplier Issue',dot:'dot-blue',tickets:supT,prev:supPrev},
     {title:'Courier Fault',dot:'dot-amber',tickets:courT,prev:courPrev},
-    {title:'Total Damages (Supplier + Courier)',dot:'dot-red',tickets:allD,prev:allDPrev}
+    ...(uncatT.length>0?[{title:'⚠️ Needs Review — Wrong Contact Reason',dot:'dot-red',tickets:uncatT,prev:uncatPrev,warn:true}]:[]),
+    {title:'Total Damages (All)',dot:'dot-red',tickets:allD,prev:allDPrev}
   ];
   let html='<div class="page-header"><div><div class="page-title accent-blue">🎱 Pool Tables</div><div class="page-subtitle">CSLT Pool Tables — Supplier &amp; Courier damage breakdown</div></div><div class="period-badge" id="pb-pool">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
-  sections.forEach(({title,dot,tickets:tix,prev})=>{
+  sections.forEach(({title,dot,tickets:tix,prev,warn})=>{
     const sc=statusCounts(tix);
     const avg=avgResHours(tix);
     const byD=sortedEntries(groupBy(tix,t=>getFieldById(t,did)));
     const prevByD=groupBy(prev,t=>getFieldById(t,did));
+    // For the warning section, also show the actual Contact Reason so ops can spot & fix
+    const bodyHtml=warn
+      ?expandableBreakdownTable(sortedEntries(groupBy(tix,t=>getFieldById(t,rid))),'Contact Reason (needs fixing)',label=>(groupBy(prev,t=>getFieldById(t,rid))[label]||[]),fieldMap)
+      :expandableBreakdownTable(byD,'Damage Type',label=>(prevByD[label]||[]),fieldMap);
+    const warnNote=warn?'<div style="margin-bottom:10px;padding:8px 12px;background:rgba(255,160,0,.1);border:1px solid rgba(255,160,0,.3);border-radius:6px;font-size:.8rem;color:var(--amber)">These tickets have a Pool Table Damage type recorded but the Contact Reason doesn\'t match Supplier Issue or Courier Fault. Ask agents to re-tag the Contact Reason so they appear in the correct section.</div>':'';
     html+=sectionBlock({
-      title:esc(title)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),
-      subtitle:tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all',
+      title:esc(title)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span>'+(warn?'':' '+deltaChip(tix.length,prev.length,true)),
+      subtitle:warn?tix.length+' tickets need re-tagging in Gorgias':tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all',
       dot,
+      borderColor:warn?'rgba(255,160,0,.4)':undefined,
+      headerBg:warn?'rgba(255,160,0,.07)':undefined,
       summaryItems:[
         {val:tix.length,label:'Total',color:'var(--text-1)'},
         {val:sc.open,label:'Open',color:'var(--amber)'},
         {val:sc.closed,label:'Closed',color:'var(--green)'},
         {val:sc.pending,label:'Pending',color:'var(--purple)'},
         {val:avg?avg+'h':'—',label:'Avg Res.'},
-        {val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'},
+        {val:warn?'—':deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'},
       ],
-      bodyHtml:expandableBreakdownTable(byD,'Damage Type',label=>(prevByD[label]||[]),fieldMap)
+      bodyHtml:warnNote+bodyHtml
     });
   });
   html+=renderExtraBlocks('pool');
@@ -2000,10 +2018,13 @@ function renderArcade(){
   const total=tickets.length;
   const colors=['blue','green','amber'];
   const dots=['dot-blue','dot-green','dot-amber'];
+  // Use Arcade Issue field as primary indicator — catches tickets with correct product
+  // but wrong Contact Reason (same data quality issue as Pool section)
+  const hasArcadeIssue=t=>{ const v=getFieldById(t,aid); return v&&v!=='Not Set'; };
   const sets=ARCADE_PRODUCTS.map((prod,i)=>({
     product:prod,
-    tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&matchesValue(getFieldById(t,rid),ARCADE_REASON)),
-    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&matchesValue(getFieldById(t,rid),ARCADE_REASON)),
+    tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(matchesValue(getFieldById(t,rid),ARCADE_REASON)||hasArcadeIssue(t))),
+    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(matchesValue(getFieldById(t,rid),ARCADE_REASON)||hasArcadeIssue(t))),
     color:colors[i],dot:dots[i]
   }));
   const allArcade=dedup(sets.flatMap(s=>s.tickets));
@@ -2177,10 +2198,13 @@ function renderPinball(){
   const pfid=fieldMap[FIELD_NAMES.PINBALL_ISSUE.toLowerCase()];
   const total=tickets.length;
   const dots=['dot-purple','dot-cyan'];
+  // Use Pinball Issue field OR Contact Reason — catches tickets with correct product
+  // but wrong Contact Reason (same data quality issue as Pool and Arcade sections)
+  const hasPinballIssue=t=>{ const v=getFieldById(t,pfid); return v&&v!=='Not Set'; };
   const sets=KELVIN_PRODUCTS.map((prod,i)=>({
     product:prod,
-    tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))),
-    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))),
+    tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))||hasPinballIssue(t))),
+    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))||hasPinballIssue(t))),
     dot:dots[i]
   }));
   const allKelvin=dedup(sets.flatMap(s=>s.tickets));
