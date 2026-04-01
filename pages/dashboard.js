@@ -238,9 +238,28 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
               <option value="60">Last 60 days</option>
               <option value="90">Last 90 days</option>
             </select>
-            <input type="date" id="date-from" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '.8rem', padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-1)', cursor: 'pointer' }} />
-            <span style={{ color: 'var(--text-3)', fontSize: '.8rem', userSelect: 'none' }}>→</span>
-            <input type="date" id="date-to" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '.8rem', padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-1)', cursor: 'pointer' }} />
+            {[
+              { id: 'date-from', value: dateFrom, onChange: setDateFrom },
+              { id: 'date-to',   value: dateTo,   onChange: setDateTo   },
+            ].map(({ id, value, onChange }, i) => (
+              <React.Fragment key={id}>
+                {i === 1 && <span style={{ color: 'var(--text-3)', fontSize: '.75rem', userSelect: 'none', flexShrink: 0 }}>→</span>}
+                <div
+                  onClick={() => { try { document.getElementById(id)?.showPicker() } catch(e) {} }}
+                  style={{ position: 'relative', cursor: 'pointer', flexShrink: 0 }}
+                  title={i === 0 ? 'Start date' : 'End date'}
+                >
+                  <svg style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--text-3)' }} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                  <input
+                    type="date"
+                    id={id}
+                    value={value}
+                    onChange={e => onChange(e.target.value)}
+                    style={{ fontSize: '.8rem', padding: '5px 10px 5px 26px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-1)', cursor: 'pointer', width: 136 }}
+                  />
+                </div>
+              </React.Fragment>
+            ))}
           </div>
           <span id="comp-label" style={{ fontSize: '.75rem', color: 'var(--text-3)', whiteSpace: 'nowrap' }} />
           <button className="btn btn-primary" id="run-btn" onClick={() => {
