@@ -1605,8 +1605,11 @@ async function fetchAllTickets(dateFrom,dateTo,onProgress){
     const pt=j.data||[];let hit=false;
     for(const t of pt){
       const d=new Date(t.created_datetime);
-      if(d>=prevFrom)all.push(t);
-      else{hit=true;break;}
+      // Always check date first so pagination stop works correctly
+      if(d<prevFrom){hit=true;break;}
+      // Skip trashed (deleted) tickets and spam tickets — they skew stats
+      if(t.trashed_datetime||t.spam===true)continue;
+      all.push(t);
     }
     if(hit||!j.meta?.next_cursor)done=true;else cursor=j.meta.next_cursor;
   }
@@ -1652,7 +1655,8 @@ async function runReport(){
     const compEl=document.getElementById('comp-label');
     if(compEl)compEl.textContent='comparing vs '+state.prevLabel;
     barEl.style.width='95%';
-    addLog('✓ Fetched '+state.tickets.length+' current + '+state.ticketsPrev.length+' prev tickets','done');
+    const filtered=result.all.length-(state.tickets.length+state.ticketsPrev.length);
+    addLog('✓ Fetched '+state.tickets.length+' current + '+state.ticketsPrev.length+' prev tickets'+(filtered>0?' ('+filtered+' trashed/spam excluded)':''),'done');
     addLog('→ Processing & rendering…');
     state.hasData=true;renderAll();
     window.__state=state;
