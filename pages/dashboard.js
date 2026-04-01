@@ -82,6 +82,86 @@ export default function Dashboard() {
 }
 
 // ── The full dashboard UI ────────────────────────────────────
+function ChatBot({ authPost }) {
+  const [open, setOpen] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const messagesEndRef = useRef(null)
+
+  useEffect(() => {
+    if (messagesEndRef.current) messagesEndRef.current.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  async function sendMessage() {
+    if (!input.trim() || loading) return
+    const userMsg = input.trim()
+    setInput('')
+    const newMessages = [...messages, { role: 'user', content: userMsg }]
+    setMessages(newMessages)
+    setLoading(true)
+    try {
+      const summary = typeof window.__buildTicketSummary === 'function' && window.__state?.hasData ? window.__buildTicketSummary() : null
+      const res = await authPost('/api/ai-chat', { messages: newMessages, summary })
+      setMessages([...newMessages, { role: 'assistant', content: res.reply }])
+    } catch (e) {
+      setMessages([...newMessages, { role: 'assistant', content: '⚠️ ' + (e.message || 'Failed to get response') }])
+    }
+    setLoading(false)
+  }
+
+  const btnStyle = { position: 'fixed', bottom: 28, right: 28, width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #4f8eff, #a78bfa)', border: 'none', cursor: 'pointer', boxShadow: '0 4px 24px rgba(79,142,255,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, color: '#fff', fontSize: '1.3rem', transition: 'transform .15s' }
+
+  if (!open) return (
+    <button onClick={() => setOpen(true)} style={btnStyle} title="Ask AI about your tickets">💬</button>
+  )
+
+  return (
+    <div style={{ position: 'fixed', bottom: 28, right: 28, width: 380, height: 530, background: 'var(--bg-1)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 8px 40px rgba(0,0,0,.45)', display: 'flex', flexDirection: 'column', zIndex: 9999, overflow: 'hidden' }}>
+      <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-2)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span style={{ fontSize: '1.1rem' }}>🤖</span>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '.9rem', color: 'var(--text-1)' }}>CS Assistant</div>
+            <div style={{ fontSize: '.7rem', color: 'var(--text-3)' }}>Ask about your ticket data</div>
+          </div>
+        </div>
+        <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-3)', fontSize: '1rem', padding: '2px 6px', lineHeight: 1 }}>✕</button>
+      </div>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {messages.length === 0 && (
+          <div style={{ color: 'var(--text-3)', fontSize: '.82rem', textAlign: 'center', marginTop: 24, lineHeight: 1.6 }}>
+            Run a report first, then ask me anything —<br />trends, anomalies, recommendations.
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <div key={i} style={{ alignSelf: m.role === 'user' ? 'flex-end' : 'flex-start', maxWidth: '88%', background: m.role === 'user' ? 'linear-gradient(135deg,#4f8eff,#6366f1)' : 'var(--bg-2)', color: m.role === 'user' ? '#fff' : 'var(--text-1)', padding: '9px 13px', borderRadius: m.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px', fontSize: '.84rem', lineHeight: 1.55, border: m.role === 'assistant' ? '1px solid var(--border)' : 'none', whiteSpace: 'pre-wrap' }}>
+            {m.content}
+          </div>
+        ))}
+        {loading && (
+          <div style={{ alignSelf: 'flex-start', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: '14px 14px 14px 4px', padding: '9px 13px', fontSize: '.84rem', color: 'var(--text-3)' }}>
+            Thinking…
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      <div style={{ padding: '11px 14px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, background: 'var(--bg-2)', flexShrink: 0 }}>
+        <input
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } }}
+          placeholder="Ask about your tickets…"
+          style={{ flex: 1, padding: '8px 11px', borderRadius: 8, background: 'var(--bg-1)', border: '1px solid var(--border)', color: 'var(--text-1)', fontSize: '.84rem', outline: 'none' }}
+        />
+        <button onClick={sendMessage} disabled={loading || !input.trim()} style={{ padding: '8px 14px', borderRadius: 8, background: 'linear-gradient(135deg,#4f8eff,#6366f1)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '.84rem', fontWeight: 600, opacity: (loading || !input.trim()) ? 0.5 : 1 }}>
+          Send
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function DashboardApp({ user, onSignOut, authFetch, authPost }) {
   const [showSettings, setShowSettings] = useState(false)
   const [customSections, setCustomSections] = useState(() => {
@@ -89,6 +169,10 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
     try { const s = localStorage.getItem('__dashConfig'); if (s) return JSON.parse(s).customSections || [] } catch(e) {}
     return []
   })
+  const [dateFrom, setDateFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0]
+  })
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
 
   useEffect(() => {
     // Load saved config
@@ -107,6 +191,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
     window.__toggleAgent = toggleAgent
     window.__generateAIReport = generateAIReport
     window.__loadCsAgent = loadCsAgent
+    window.__buildTicketSummary = buildTicketSummary
 
     return () => {
       delete window.__authFetch
@@ -118,6 +203,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
       delete window.__toggleAgent
       delete window.__generateAIReport
       delete window.__loadCsAgent
+      delete window.__buildTicketSummary
       delete window.__state
     }
   }, [])
@@ -133,13 +219,29 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
           </div>
           <div className="topbar-sep" />
           <div id="error-banner" className="error-banner" />
-          <select id="period-select" defaultValue="30">
-            <option value="7">Last 7 days</option>
-            <option value="14">Last 14 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="60">Last 60 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <select onChange={e => {
+              const days = parseInt(e.target.value, 10)
+              if (!days) return
+              const to = new Date()
+              const from = new Date()
+              from.setDate(from.getDate() - days)
+              const fmt = d => d.toISOString().split('T')[0]
+              setDateFrom(fmt(from))
+              setDateTo(fmt(to))
+              e.target.value = ''
+            }} defaultValue="" style={{ fontSize: '.8rem', padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-2)', cursor: 'pointer' }}>
+              <option value="" disabled>Quick pick…</option>
+              <option value="7">Last 7 days</option>
+              <option value="14">Last 14 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="60">Last 60 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+            <input type="date" id="date-from" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ fontSize: '.8rem', padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-1)', cursor: 'pointer' }} />
+            <span style={{ color: 'var(--text-3)', fontSize: '.8rem', userSelect: 'none' }}>→</span>
+            <input type="date" id="date-to" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ fontSize: '.8rem', padding: '4px 8px', background: 'var(--bg-2)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-1)', cursor: 'pointer' }} />
+          </div>
           <span id="comp-label" style={{ fontSize: '.75rem', color: 'var(--text-3)', whiteSpace: 'nowrap' }} />
           <button className="btn btn-primary" id="run-btn" onClick={() => {
             if (typeof window.__runReport !== 'function') {
@@ -286,6 +388,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
           }}
         />
       )}
+      <ChatBot authPost={authPost} />
     </>
   )
 }
@@ -1444,7 +1547,8 @@ function deltaChip(curr,prev,goodWhenDown=true){
   return'<span class="delta-chip '+cls+'">'+arrow+' '+pStr+'</span>';
 }
 
-let state={fieldMap:{},tickets:[],ticketsPrev:[],lookbackDays:30,hasData:false,prevLabel:''};
+let state={fieldMap:{},tickets:[],ticketsPrev:[],lookbackDays:30,hasData:false,prevLabel:'',periodLabel:''};
+function getPeriodLabel(){return state.periodLabel||'Last '+state.lookbackDays+' days';}
 let agentFilter=[];// [] = all agents shown
 function toggleAgent(name){
   if(name==='__all'){agentFilter=[];}
@@ -1469,10 +1573,10 @@ function matchesValue(fieldVal,filterVal){const f=fieldVal.toLowerCase().trim();
 
 async function fetchCustomFields(){const j=await window.__authFetch('/api/custom-fields');const map={};(j.data||[]).forEach(f=>{if(f.label)map[f.label.toLowerCase()]=f.id;});return map;}
 
-async function fetchAllTickets(days,onProgress){
-  // Fetch 2x the period so we can split current vs prev
-  const totalDays=days*2;
-  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-totalDays);
+async function fetchAllTickets(dateFrom,dateTo,onProgress){
+  // Previous period = same duration immediately before dateFrom
+  const duration=dateTo.getTime()-dateFrom.getTime();
+  const prevFrom=new Date(dateFrom.getTime()-duration);
   const all=[];let cursor=null,page=0,done=false;
   while(!done){
     page++;
@@ -1480,13 +1584,16 @@ async function fetchAllTickets(days,onProgress){
     onProgress('Fetching page '+page+'… ('+all.length+' tickets so far)');
     const j=await window.__authFetch(url);
     const pt=j.data||[];let hit=false;
-    for(const t of pt){if(new Date(t.created_datetime)>=cutoff)all.push(t);else{hit=true;break;}}
+    for(const t of pt){
+      const d=new Date(t.created_datetime);
+      if(d>=prevFrom)all.push(t);
+      else{hit=true;break;}
+    }
     if(hit||!j.meta?.next_cursor)done=true;else cursor=j.meta.next_cursor;
   }
-  // Split: current = last N days, prev = N days before that
-  const currCutoff=new Date();currCutoff.setDate(currCutoff.getDate()-days);
-  const current=all.filter(t=>new Date(t.created_datetime)>=currCutoff);
-  const prev=all.filter(t=>new Date(t.created_datetime)<currCutoff);
+  // Split: current = dateFrom..dateTo, prev = prevFrom..dateFrom
+  const current=all.filter(t=>{const d=new Date(t.created_datetime);return d>=dateFrom&&d<=dateTo;});
+  const prev=all.filter(t=>{const d=new Date(t.created_datetime);return d>=prevFrom&&d<dateFrom;});
   return{current,prev,all};
 }
 
@@ -1494,7 +1601,14 @@ async function runReport(){
   const btn=document.getElementById('run-btn');
   const errBanner=document.getElementById('error-banner');
   errBanner.classList.remove('visible');errBanner.textContent='';
-  state.lookbackDays=parseInt(document.getElementById('period-select').value,10);
+  const fromVal=document.getElementById('date-from').value;
+  const toVal=document.getElementById('date-to').value;
+  if(!fromVal||!toVal){errBanner.textContent='Please select a start and end date.';errBanner.classList.add('visible');return;}
+  const dateFrom=new Date(fromVal+'T00:00:00');
+  const dateTo=new Date(toVal+'T23:59:59');
+  if(dateFrom>dateTo){errBanner.textContent='Start date must be before end date.';errBanner.classList.add('visible');return;}
+  state.lookbackDays=Math.max(1,Math.round((dateTo-dateFrom)/(1000*60*60*24)));
+  state.dateFrom=dateFrom;state.dateTo=dateTo;
   showLoading(true);btn.disabled=true;
   const logEl=document.getElementById('loading-log');
   const barEl=document.getElementById('loading-bar');
@@ -1505,16 +1619,19 @@ async function runReport(){
     state.fieldMap=await fetchCustomFields();
     addLog('✓ Custom fields resolved','done');barEl.style.width='15%';
     addLog('→ Fetching tickets (current + previous period)…');
-    const result=await fetchAllTickets(state.lookbackDays,msg=>{addLog(msg);barEl.style.width=Math.min(85,15+state.tickets.length/5)+'%';});
+    const result=await fetchAllTickets(state.dateFrom,state.dateTo,msg=>{addLog(msg);barEl.style.width=Math.min(85,15+state.tickets.length/5)+'%';});
     state.tickets=result.current;
     state.ticketsPrev=result.prev;
-    // Build prev period label for topbar
-    const prevEnd=new Date();prevEnd.setDate(prevEnd.getDate()-state.lookbackDays);
-    const prevStart=new Date();prevStart.setDate(prevStart.getDate()-state.lookbackDays*2);
-    state.prevLabel=prevStart.toLocaleDateString('en-AU',{day:'numeric',month:'short'})+' – '+prevEnd.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    // Build period and prev period labels
+    const fmt=d=>d.toLocaleDateString('en-AU',{day:'numeric',month:'short',year:'numeric'});
+    const fmtShort=d=>d.toLocaleDateString('en-AU',{day:'numeric',month:'short'});
+    state.periodLabel=fmtShort(state.dateFrom)+' – '+fmtShort(state.dateTo);
+    const duration=state.dateTo.getTime()-state.dateFrom.getTime();
+    const prevFrom=new Date(state.dateFrom.getTime()-duration);
+    state.prevLabel=fmtShort(prevFrom)+' – '+fmtShort(state.dateFrom);
     // Update comparison indicator in topbar
     const compEl=document.getElementById('comp-label');
-    if(compEl)compEl.textContent='vs '+state.prevLabel;
+    if(compEl)compEl.textContent='comparing vs '+state.prevLabel;
     barEl.style.width='95%';
     addLog('✓ Fetched '+state.tickets.length+' current + '+state.ticketsPrev.length+' prev tickets','done');
     addLog('→ Processing & rendering…');
@@ -1599,7 +1716,7 @@ function renderCustomSections(){
     let tix=tickets,prev=ticketsPrev;
     if(section.productFilter){const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];if(pid){tix=tickets.filter(t=>getFieldById(t,pid).toLowerCase()===section.productFilter.toLowerCase());prev=ticketsPrev.filter(t=>getFieldById(t,pid).toLowerCase()===section.productFilter.toLowerCase());}}
     if(badge)badge.textContent=tix.length;
-    let html='<div class="page-header"><div><div class="page-title">'+(section.icon||'📊')+' '+esc(section.label)+'</div><div class="page-subtitle">'+esc(section.subtitle||'')+'</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+    let html='<div class="page-header"><div><div class="page-title">'+(section.icon||'📊')+' '+esc(section.label)+'</div><div class="page-subtitle">'+esc(section.subtitle||'')+'</div></div><div class="period-badge">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
     (section.blocks||[]).forEach(block=>{html+=renderDynamicBlock(block,tix,prev,fieldMap);});
     if(!(section.blocks&&section.blocks.length))html+='<div class="empty-state"><div class="empty-state-msg">No blocks configured — open ⚙️ Settings to add breakdown blocks to this section</div></div>';
     el.innerHTML=html;
@@ -1794,7 +1911,7 @@ function renderOverview(){
   const compBadge='<span style="font-size:.72rem;color:var(--text-3);margin-left:8px">vs '+state.prevLabel+'</span>';
   const agentLabel=agentFilter.length>0?' · '+agentFilter.join(', '):'';
   const html=agentBar+
-    '<div class="page-header"><div><div class="page-title">◈ Overview</div><div class="page-subtitle">Last '+lookbackDays+' days &nbsp;·&nbsp; '+total+' tickets'+esc(agentLabel)+'</div></div><div class="period-badge">Last '+lookbackDays+' days'+compBadge+'</div></div>'+
+    '<div class="page-header"><div><div class="page-title">◈ Overview</div><div class="page-subtitle">'+getPeriodLabel()+' &nbsp;·&nbsp; '+total+' tickets'+esc(agentLabel)+'</div></div><div class="period-badge">'+getPeriodLabel()+compBadge+'</div></div>'+
     '<div class="stats-grid">'+
     statCardComp('Total Tickets',total,ptotal,'blue','blue',true)+
     statCardComp('Open',sc.open,psc.open,'amber','amber',true)+
@@ -1827,7 +1944,7 @@ function renderPool(){
     {title:'Courier Fault',dot:'dot-amber',tickets:courT,prev:courPrev},
     {title:'Total Damages (Supplier + Courier)',dot:'dot-red',tickets:allD,prev:allDPrev}
   ];
-  let html='<div class="page-header"><div><div class="page-title accent-blue">🎱 Pool Tables</div><div class="page-subtitle">CSLT Pool Tables — Supplier &amp; Courier damage breakdown</div></div><div class="period-badge" id="pb-pool">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title accent-blue">🎱 Pool Tables</div><div class="page-subtitle">CSLT Pool Tables — Supplier &amp; Courier damage breakdown</div></div><div class="period-badge" id="pb-pool">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   sections.forEach(({title,dot,tickets:tix,prev})=>{
     const sc=statusCounts(tix);
     const avg=avgResHours(tix);
@@ -1869,7 +1986,7 @@ function renderArcade(){
   const allArcade=dedup(sets.flatMap(s=>s.tickets));
   const allArcadePrev=dedup(sets.flatMap(s=>s.prev));
   document.getElementById('badge-arcade').textContent=allArcade.length;
-  let html='<div class="page-header"><div><div class="page-title accent-green">🕹 Gao Arcades</div><div class="page-subtitle">Upright Arcade · Cocktail Pro · Cocktail MKII — Item Not Working</div></div><div class="period-badge" id="pb-arcade">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title accent-green">🕹 Gao Arcades</div><div class="page-subtitle">Upright Arcade · Cocktail Pro · Cocktail MKII — Item Not Working</div></div><div class="period-badge" id="pb-arcade">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   sets.forEach(({product,tickets:tix,prev,dot})=>{
     const sc=statusCounts(tix);const avg=avgResHours(tix);
     const byI=sortedEntries(groupBy(tix,t=>getFieldById(t,aid)));
@@ -1914,7 +2031,7 @@ function renderCourier(){
   const allC=dedup(tickets.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))));
   const allCPrev=dedup(ticketsPrev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))));
   document.getElementById('badge-courier').textContent=allC.length;
-  let html='<div class="page-header"><div><div class="page-title accent-amber">🚚 Courier Issues</div><div class="page-subtitle">Missing · Delayed · Wrong Address · Damaged — by courier</div></div><div class="period-badge" id="pb-courier">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title accent-amber">🚚 Courier Issues</div><div class="page-subtitle">Missing · Delayed · Wrong Address · Damaged — by courier</div></div><div class="period-badge" id="pb-courier">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   COURIER_REASONS.forEach((reason,i)=>{
     const tix=tickets.filter(t=>matchesValue(getFieldById(t,rid),reason));
     const prev=ticketsPrev.filter(t=>matchesValue(getFieldById(t,rid),reason));
@@ -1955,7 +2072,7 @@ function renderOps(){
     scAll.open+=sc.open;scAll.closed+=sc.closed;scAll.pending+=sc.pending;
     return'<tr><td style="max-width:300px;white-space:normal">'+esc(reason)+'</td><td style="font-weight:600">'+tix.length+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+prev.length+'</td><td style="text-align:right">'+deltaChip(tix.length,prev.length,true)+'</td><td><span class="tag tag-open">'+sc.open+'</span></td><td><span class="tag tag-closed">'+sc.closed+'</span></td><td><span class="tag tag-pending">'+sc.pending+'</span></td></tr>';
   }).join('');
-  let html='<div class="page-header"><div><div class="page-title accent-red">⚙️ Ops Issues</div><div class="page-subtitle">Picking errors · Tracking · Delays · Wrong address · Misorder</div></div><div class="period-badge" id="pb-ops">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title accent-red">⚙️ Ops Issues</div><div class="page-subtitle">Picking errors · Tracking · Delays · Wrong address · Misorder</div></div><div class="period-badge" id="pb-ops">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   html+=sectionBlock({title:'Ops Summary — All Reasons <span style="font-size:.8rem;font-weight:400">'+opsTotal+'</span> '+deltaChip(opsTotal,opsPrevTotal,true),dot:'dot-red',
     summaryItems:[{val:opsTotal,label:'Total',color:'var(--red)'},{val:scAll.open,label:'Open',color:'var(--amber)'},{val:scAll.closed,label:'Closed',color:'var(--green)'},{val:scAll.pending,label:'Pending',color:'var(--purple)'},{val:deltaChip(opsTotal,opsPrevTotal,true)||'—',label:'vs Prev'}],
     bodyHtml:'<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Contact Reason</th><th>Total</th><th style="color:var(--text-3)">Prev</th><th>Δ</th><th>Open</th><th>Closed</th><th>Pending</th></tr></thead><tbody>'+summaryRows+'</tbody><tfoot><tr class="total-row"><td>TOTAL</td><td>'+opsTotal+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+opsPrevTotal+'</td><td style="text-align:right">'+deltaChip(opsTotal,opsPrevTotal,true)+'</td><td><span class="tag tag-open">'+scAll.open+'</span></td><td><span class="tag tag-closed">'+scAll.closed+'</span></td><td><span class="tag tag-pending">'+scAll.pending+'</span></td></tr></tfoot></table></div>'});
@@ -2011,7 +2128,7 @@ function renderRefunds(){
   function statCardRef(label,curr,prev,val,cls,color,goodWhenDown=true){
     return'<div class="stat-card '+cls+'"><div class="stat-label">'+label+'</div><div class="stat-value '+color+'">'+curr+'</div><div class="stat-sub" style="display:flex;align-items:center;gap:6px">'+(val!==null?'<span>$'+val.toFixed(2)+'</span>·':'')+'<span style="color:var(--text-3)">prev: '+prev+'</span>'+deltaChip(curr,prev,goodWhenDown)+'</div></div>';
   }
-  let html='<div class="page-header"><div><div class="page-title accent-purple">💰 Refunds &amp; Replacements</div><div class="page-subtitle">Full refunds · Partial refunds · Replacements · Free gifts — all products</div></div><div class="period-badge" id="pb-refunds">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>'+
+  let html='<div class="page-header"><div><div class="page-title accent-purple">💰 Refunds &amp; Replacements</div><div class="page-subtitle">Full refunds · Partial refunds · Replacements · Free gifts — all products</div></div><div class="period-badge" id="pb-refunds">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>'+
     '<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">'+
     statCardRef('Full Refunds',fullR.length,fullRPrev.length,fullVal,'red','red')+
     statCardRef('Partial Refunds',partR.length,partRPrev.length,partVal,'amber','amber')+
@@ -2046,7 +2163,7 @@ function renderPinball(){
   const allKelvin=dedup(sets.flatMap(s=>s.tickets));
   const allKelvinPrev=dedup(sets.flatMap(s=>s.prev));
   document.getElementById('badge-pinball').textContent=allKelvin.length;
-  let html='<div class="page-header"><div><div class="page-title accent-purple">🎰 Kelvin Pinball &amp; Drivers</div><div class="page-subtitle">Pinball Machine · Gearshift Pro — Item Not Working &amp; Supplier Issues</div></div><div class="period-badge" id="pb-pinball">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title accent-purple">🎰 Kelvin Pinball &amp; Drivers</div><div class="page-subtitle">Pinball Machine · Gearshift Pro — Item Not Working &amp; Supplier Issues</div></div><div class="period-badge" id="pb-pinball">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   sets.forEach(({product,tickets:tix,prev,dot})=>{
     const byI=sortedEntries(groupBy(tix,t=>getFieldById(t,pfid)||getFieldById(t,rid)));
     const prevByI=groupBy(prev,t=>getFieldById(t,pfid)||getFieldById(t,rid));
@@ -2087,7 +2204,7 @@ function renderKegerators(){
   const missingPrev=kegPrev.filter(t=>matchesValue(getFieldById(t,rid),KEG_MISSING_REASON));
   const byMissing=kmid?sortedEntries(groupBy(missingT,t=>getFieldById(t,kmid))):[];
   const prevByMissing=kmid?groupBy(missingPrev,t=>getFieldById(t,kmid)):{};
-  let html='<div class="page-header"><div><div class="page-title" style="color:var(--amber)">🍺 Kegerators</div><div class="page-subtitle">Gen 2.0 — ticket breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title" style="color:var(--amber)">🍺 Kegerators</div><div class="page-subtitle">Gen 2.0 — ticket breakdown by contact reason</div></div><div class="period-badge">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   html+=sectionBlock({
     title:'Kegerators <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+kegT.length+'</span> '+deltaChip(kegT.length,kegPrev.length,true),
     subtitle:kegT.length+' tickets · prev: '+kegPrev.length+' · '+pct(kegT.length,total)+' of all',
@@ -2136,7 +2253,7 @@ function renderLEDBars(){
   const byR=sortedEntries(groupBy(ledT,t=>getFieldById(t,rid)));
   const prevByR=groupBy(ledPrev,t=>getFieldById(t,rid));
   const sc=statusCounts(ledT);const avg=avgResHours(ledT);
-  let html='<div class="page-header"><div><div class="page-title" style="color:var(--cyan)">💡 LED Bar Signs</div><div class="page-subtitle">LED Bar Sign tickets — breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title" style="color:var(--cyan)">💡 LED Bar Signs</div><div class="page-subtitle">LED Bar Sign tickets — breakdown by contact reason</div></div><div class="period-badge">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   html+=sectionBlock({
     title:'LED Bar Signs <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+ledT.length+'</span> '+deltaChip(ledT.length,ledPrev.length,true),
     subtitle:ledT.length+' tickets · prev: '+ledPrev.length+' · '+pct(ledT.length,total)+' of all',
@@ -2166,7 +2283,7 @@ function renderBarFridges(){
   const byR=sortedEntries(groupBy(barT,t=>getFieldById(t,rid)));
   const prevByR=groupBy(barPrev,t=>getFieldById(t,rid));
   const sc=statusCounts(barT);const avg=avgResHours(barT);
-  let html='<div class="page-header"><div><div class="page-title" style="color:var(--blue)">🧊 Bar Fridges</div><div class="page-subtitle">Bar Fridge tickets — breakdown by contact reason</div></div><div class="period-badge">Last '+state.lookbackDays+' days <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  let html='<div class="page-header"><div><div class="page-title" style="color:var(--blue)">🧊 Bar Fridges</div><div class="page-subtitle">Bar Fridge tickets — breakdown by contact reason</div></div><div class="period-badge">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   html+=sectionBlock({
     title:'Bar Fridges <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+barT.length+'</span> '+deltaChip(barT.length,barPrev.length,true),
     subtitle:barT.length+' tickets · prev: '+barPrev.length+' · '+pct(barT.length,total)+' of all',
@@ -2192,7 +2309,7 @@ function renderAIReport(){
   const hasData=s&&s.hasData;
   const cached=window.__aiReportCache;
   if(!hasData){el.innerHTML='<div class="empty-state" style="padding:60px 20px"><div class="empty-state-msg" style="font-size:1rem">Run the report first to load ticket data, then generate AI insights.</div></div>';return;}
-  const periodLabel='Last '+s.lookbackDays+' days';
+  const periodLabel=getPeriodLabel();
   const genBtnHTML='<button class="ai-generate-btn" onclick="window.__generateAIReport()" id="ai-gen-btn">🤖 Generate Weekly Insights</button>';
   const headerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#4f8eff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">🤖 AI Insights</div><div class="page-subtitle">AI-generated analysis of recurring issues and operational recommendations</div></div><div class="period-badge">'+periodLabel+'</div></div>';
   if(!cached){
@@ -2262,7 +2379,7 @@ function buildTicketSummary(){
   const courierP=ticketsPrev.filter(t=>COURIER_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
   const opsP=ticketsPrev.filter(t=>OPS_REASONS.some(r=>matchesValue(getFieldById(t,rid),r)));
   return{
-    period:{days:lookbackDays,label:'Last '+lookbackDays+' days'},
+    period:{days:lookbackDays,label:getPeriodLabel()},
     totals:{current:tickets.length,previous:ticketsPrev.length,changePct:ticketsPrev.length?Math.round((tickets.length-ticketsPrev.length)/ticketsPrev.length*100):null},
     statusBreakdown:statusC(tickets),
     sections:{
@@ -2284,7 +2401,7 @@ async function generateAIReport(){
   if(!state||!state.hasData){alert('Please run the report first.');return;}
   // Show thinking state
   const s=state;
-  const periodLabel='Last '+s.lookbackDays+' days';
+  const periodLabel=getPeriodLabel();
   el.innerHTML='<div class="page-header"><div><div class="page-title" style="background:linear-gradient(135deg,#4f8eff,#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent">🤖 AI Insights</div><div class="page-subtitle">AI-generated analysis of recurring issues and operational recommendations</div></div><div class="period-badge">'+periodLabel+'</div></div>'+
     '<div class="section-block" style="border-color:rgba(167,139,250,.3)"><div class="section-block-body" style="padding:28px">'+
     '<div class="ai-thinking"><div class="spin"></div> Analysing '+s.tickets.length+' tickets — this takes about 10 seconds…</div></div></div>';
