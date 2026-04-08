@@ -1835,10 +1835,12 @@ let _drillId=0;
 function ticketDrillHtml(tickets,fieldMap){
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
   const resfid=fieldMap[FIELD_NAMES.RESOLUTION.toLowerCase()];
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
   if(!tickets.length)return'<div style="padding:8px 16px;font-size:.8rem;color:var(--text-3)">No tickets</div>';
   return'<div class="drill-list">'+[...tickets].sort((a,b)=>new Date(b.created_datetime)-new Date(a.created_datetime)).map(t=>{
     const cust=esc((t.customer?.name)||'Unknown');
     const reason=esc(getFieldById(t,rid));
+    const product=getFieldById(t,pid);
     const resolution=getFieldById(t,resfid);
     const status=t.status||'open';
     const sc=status==='closed'?'tag-closed':status==='pending'?'tag-pending':'tag-open';
@@ -1848,6 +1850,7 @@ function ticketDrillHtml(tickets,fieldMap){
       '<a href="'+url+'" target="_blank" rel="noopener">#'+t.id+'</a>'+
       '<span class="drill-sep">·</span>'+
       '<span style="font-weight:500">'+cust+'</span>'+
+      (product&&product!=='Not Set'?'<span class="drill-sep">·</span><span style="font-size:.75rem;color:var(--blue);background:var(--blue-soft);padding:1px 6px;border-radius:4px;white-space:nowrap">'+esc(product)+'</span>':'')+
       '<span class="drill-sep">·</span>'+
       '<span class="drill-reason">'+reason+'</span>'+
       (resolution&&resolution!=='Not Set'?'<span class="drill-sep">→</span><span class="drill-res">'+esc(resolution)+'</span>':'')+
@@ -2125,7 +2128,16 @@ function renderOps(){
   let summaryRows=opsGroups.map(({reason,tickets:tix,prev})=>{
     const sc=statusCounts(tix);
     scAll.open+=sc.open;scAll.closed+=sc.closed;scAll.pending+=sc.pending;
-    return'<tr><td style="max-width:300px;white-space:normal">'+esc(reason)+'</td><td style="font-weight:600">'+tix.length+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+prev.length+'</td><td style="text-align:right">'+deltaChip(tix.length,prev.length,true)+'</td><td><span class="tag tag-open">'+sc.open+'</span></td><td><span class="tag tag-closed">'+sc.closed+'</span></td><td><span class="tag tag-pending">'+sc.pending+'</span></td></tr>';
+    const did='dr'+(++_drillId);
+    return'<tr class="drill-row-hdr" data-drill-id="'+did+'">'+
+      '<td style="max-width:300px;white-space:normal">'+esc(reason)+'<span class="drill-arrow" id="darr-'+did+'">▸</span></td>'+
+      '<td style="font-weight:600">'+tix.length+'</td>'+
+      '<td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+prev.length+'</td>'+
+      '<td style="text-align:right">'+deltaChip(tix.length,prev.length,true)+'</td>'+
+      '<td><span class="tag tag-open">'+sc.open+'</span></td>'+
+      '<td><span class="tag tag-closed">'+sc.closed+'</span></td>'+
+      '<td><span class="tag tag-pending">'+sc.pending+'</span></td></tr>'+
+      '<tr class="drill-content" id="dcnt-'+did+'"><td colspan="7" style="padding:0">'+ticketDrillHtml(tix,fieldMap)+'</td></tr>';
   }).join('');
   let html='<div class="page-header"><div><div class="page-title accent-red">⚙️ Ops Issues</div><div class="page-subtitle">Picking errors · Tracking · Delays · Wrong address · Misorder</div></div><div class="period-badge" id="pb-ops">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
   html+=sectionBlock({title:'Ops Summary — All Reasons <span style="font-size:.8rem;font-weight:400">'+opsTotal+'</span> '+deltaChip(opsTotal,opsPrevTotal,true),dot:'dot-red',
