@@ -2189,7 +2189,74 @@ function renderRefunds(){
   const freeU=replTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='free product upgrade');
   const freeG=replTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='free gift');
   const replS=replTix.filter(t=>getFieldById(t,resfid).toLowerCase()==='replacement sent');
-  document.getElementById('badge-refunds').textContent=refundTix.length+replTix.length;
+  // ── Extended analytics ───────────────────────────────────────
+  const allOutcomes=dedup([...refundTix,...replTix]);
+  const refundRate=total>0?(allOutcomes.length/total*100).toFixed(1):'0.0';
+  const openOutcomes=allOutcomes.filter(t=>t.status==='open'||t.status==='new');
+  const openRefundVal=sumMoney(openOutcomes.filter(t=>refundTix.some(r=>r.id===t.id)),rvfid);
+  document.getElementById('badge-refunds').textContent=allOutcomes.length;
+
+  // ── Root cause: group all outcomes by contact reason ─────────
+  const byCause=sortedEntries(groupBy(allOutcomes,t=>getFieldById(t,rid)||'Unknown'));
+  const causeRows=byCause.map(([reason,tix])=>{
+    const refInCause=tix.filter(t=>refundTix.some(r=>r.id===t.id));
+    const replInCause=tix.filter(t=>replTix.some(r=>r.id===t.id));
+    const val=sumMoney(refInCause,rvfid);
+    const pctOf=allOutcomes.length>0?Math.round(tix.length/allOutcomes.length*100):0;
+    const isSupplier=matchesValue(reason,REASON_SUPPLIER)||matchesValue(reason,'Item Damaged::Supplier Issue');
+    const isCourier=COURIER_REASONS.some(r=>matchesValue(reason,r));
+    const isOps=OPS_REASONS.some(r=>matchesValue(reason,r));
+    const fault=isSupplier?'<span style="color:var(--amber);font-size:.7rem;font-weight:700;letter-spacing:.04em">SUPPLIER</span>':isCourier?'<span style="color:var(--red);font-size:.7rem;font-weight:700;letter-spacing:.04em">COURIER</span>':isOps?'<span style="color:var(--purple);font-size:.7rem;font-weight:700;letter-spacing:.04em">OPS</span>':'<span style="color:var(--text-3);font-size:.7rem">INTERNAL</span>';
+    const did2='dr'+(++_drillId);
+    return'<tr class="drill-row-hdr" data-drill-id="'+did2+'">'+
+      '<td style="max-width:260px;white-space:normal">'+esc(reason)+'<span class="drill-arrow" id="darr-'+did2+'">▸</span></td>'+
+      '<td style="font-weight:700">'+tix.length+'</td>'+
+      '<td>'+fault+'</td>'+
+      '<td style="font-family:var(--font-data);font-size:.78rem;color:var(--text-2)">'+pctOf+'%</td>'+
+      '<td><span class="tag tag-open">'+refInCause.length+'</span></td>'+
+      '<td><span class="tag tag-closed">'+replInCause.length+'</span></td>'+
+      '<td>'+(val>0?'<span class="val-chip">$'+val.toFixed(2)+'</span>':'—')+'</td>'+
+      '</tr>'+
+      '<tr class="drill-content" id="dcnt-'+did2+'"><td colspan="7" style="padding:0">'+ticketDrillHtml(tix,fieldMap)+'</td></tr>';
+  }).join('');
+
+  // ── Agent accountability ──────────────────────────────────────
+  const agentList=[...new Set(allOutcomes.map(t=>getAgentName(t)))].sort();
+  const agentRows=agentList.map(agent=>{
+    const agentAll=tickets.filter(t=>getAgentName(t)===agent);
+    const agentRefunds=refundTix.filter(t=>getAgentName(t)===agent);
+    const agentRepls=replTix.filter(t=>getAgentName(t)===agent);
+    const agentOutcomes=dedup([...agentRefunds,...agentRepls]);
+    const agentVal=sumMoney(agentRefunds,rvfid);
+    const rate=agentAll.length>0?(agentOutcomes.length/agentAll.length*100).toFixed(1):'0.0';
+    const rateColor=parseFloat(rate)>15?'color:var(--red)':parseFloat(rate)>8?'color:var(--amber)':'color:var(--green)';
+    const prodSet=[...new Set(agentOutcomes.map(t=>getFieldById(t,pid)).filter(p=>p&&p!=='Not Set'))].slice(0,3).join(', ');
+    const did2='dr'+(++_drillId);
+    return'<tr class="drill-row-hdr" data-drill-id="'+did2+'">'+
+      '<td style="font-weight:600">'+esc(agent)+'<span class="drill-arrow" id="darr-'+did2+'">▸</span></td>'+
+      '<td style="color:var(--text-3);font-family:var(--font-data)">'+agentAll.length+'</td>'+
+      '<td style="font-weight:600">'+agentRefunds.length+'</td>'+
+      '<td style="font-weight:600">'+agentRepls.length+'</td>'+
+      '<td>'+(agentVal>0?'<span class="val-chip">$'+agentVal.toFixed(2)+'</span>':'—')+'</td>'+
+      '<td style="'+rateColor+';font-weight:700;font-family:var(--font-data)">'+rate+'%</td>'+
+      '<td style="font-size:.72rem;color:var(--text-3);max-width:200px;white-space:normal">'+esc(prodSet||'—')+'</td>'+
+      '</tr>'+
+      '<tr class="drill-content" id="dcnt-'+did2+'"><td colspan="7" style="padding:0">'+ticketDrillHtml(agentOutcomes,fieldMap)+'</td></tr>';
+  }).join('');
+
+  // ── Agent × Product matrix ────────────────────────────────────
+  const agentProdRows=agentList.flatMap(agent=>{
+    const agentOutcomes=allOutcomes.filter(t=>getAgentName(t)===agent);
+    const byProd=sortedEntries(groupBy(agentOutcomes,t=>getFieldById(t,pid)||'Unknown'));
+    return byProd.map(([prod,tix])=>{
+      const refs=tix.filter(t=>refundTix.some(r=>r.id===t.id)).length;
+      const repls=tix.filter(t=>replTix.some(r=>r.id===t.id)).length;
+      const val=sumMoney(tix.filter(t=>refundTix.some(r=>r.id===t.id)),rvfid);
+      return'<tr><td style="font-weight:600">'+esc(agent)+'</td><td>'+esc(prod)+'</td><td style="font-weight:600">'+tix.length+'</td><td>'+refs+'</td><td>'+repls+'</td><td>'+(val>0?'<span class="val-chip">$'+val.toFixed(2)+'</span>':'—')+'</td></tr>';
+    });
+  }).join('');
+
+  // ── Existing product/ticket tables ───────────────────────────
   const byProdR=sortedEntries(groupBy(refundTix,t=>getFieldById(t,pid)));
   const byProdRPrev=groupBy(refundPrev,t=>getFieldById(t,pid));
   const prodRows=byProdR.map(([prod,tix])=>{
@@ -2225,18 +2292,27 @@ function renderRefunds(){
     return'<div class="stat-card '+cls+'"><div class="stat-label">'+label+'</div><div class="stat-value '+color+'">'+curr+'</div><div class="stat-sub" style="display:flex;align-items:center;gap:6px">'+(val!==null?'<span>$'+val.toFixed(2)+'</span>·':'')+'<span style="color:var(--text-3)">prev: '+prev+'</span>'+deltaChip(curr,prev,goodWhenDown)+'</div></div>';
   }
   let html='<div class="page-header"><div><div class="page-title accent-purple">💰 Refunds &amp; Replacements</div><div class="page-subtitle">Full refunds · Partial refunds · Replacements · Free gifts — all products</div></div><div class="period-badge" id="pb-refunds">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>'+
-    '<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">'+
+    // ── KPI grid ───────────────────────────────────────────────
+    '<div class="stats-grid" style="grid-template-columns:repeat(auto-fit,minmax(155px,1fr))">'+
     statCardRef('Full Refunds',fullR.length,fullRPrev.length,fullVal,'red','red')+
     statCardRef('Partial Refunds',partR.length,partRPrev.length,partVal,'amber','amber')+
     '<div class="stat-card purple"><div class="stat-label">Total Refund Value</div><div class="stat-value purple" style="font-size:1.4rem">$'+totalVal.toFixed(2)+'</div><div class="stat-sub" style="display:flex;align-items:center;gap:6px"><span style="color:var(--text-3)">prev: $'+totalValPrev.toFixed(2)+'</span>'+deltaChip(totalVal,totalValPrev,true)+'</div></div>'+
     statCardRef('Replacements',replS.length,replPrev.length,null,'green','green')+
-    statCardRef('Free Upgrades',freeU.length,0,null,'cyan','',true)+
-    statCardRef('Free Gifts',freeG.length,0,null,'blue','blue',true)+
+    '<div class="stat-card blue"><div class="stat-label">Outcome Rate</div><div class="stat-value blue">'+refundRate+'%</div><div class="stat-sub"><span style="color:var(--text-3)">of all '+total+' tickets</span></div></div>'+
+    '<div class="stat-card '+(openOutcomes.length>0?'amber':'')+'"><div class="stat-label">⚠ Open Exposure</div><div class="stat-value '+(openOutcomes.length>0?'amber':'green')+'">'+openOutcomes.length+'</div><div class="stat-sub"><span style="color:var(--text-3)">unresolved'+(openRefundVal>0?' · $'+openRefundVal.toFixed(2):'')+'</span></div></div>'+
     '</div>'+
-    '<div class="blocks-2col">'+
+    // ── Root Cause Analysis ────────────────────────────────────
+    '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-red"></span>Root Cause Analysis</div><div class="section-block-subtitle">Why are we refunding and replacing? — click any row to see the tickets</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Contact Reason <span style="font-size:.6rem;opacity:.45;font-weight:400">▸ click to expand</span></th><th>Count</th><th>Fault</th><th>% of Outcomes</th><th>Refunds</th><th>Replacements</th><th>Refund Value</th></tr></thead><tbody>'+causeRows+'</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+allOutcomes.length+'</td><td></td><td>100%</td><td>'+refundTix.length+'</td><td>'+replTix.length+'</td><td><span class="val-chip">$'+totalVal.toFixed(2)+'</span></td></tr></tfoot></table></div></div></div>'+
+    // ── Agent Accountability ───────────────────────────────────
+    '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-amber"></span>Agent Accountability</div><div class="section-block-subtitle">Refunds &amp; replacements by assigned agent — outcome rate colour-coded: green &lt;8%, amber 8–15%, red &gt;15%</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Agent <span style="font-size:.6rem;opacity:.45;font-weight:400">▸ click to expand</span></th><th style="color:var(--text-3)">Tickets</th><th>Refunds</th><th>Replacements</th><th>Refund Value</th><th>Outcome Rate</th><th>Products Involved</th></tr></thead><tbody>'+agentRows+'</tbody></table></div></div></div>'+
+    // ── By-Product tables (existing) ──────────────────────────
+    '<div class="blocks-2col" style="margin-top:20px">'+
     '<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-purple"></span>Refunds by Product</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Count</th><th style="color:var(--text-3)">Prev</th><th>Δ</th><th>Total Value</th><th>Avg Value</th><th>Partial</th></tr></thead><tbody>'+prodRows+'</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+refundTix.length+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+refundPrev.length+'</td><td style="text-align:right">'+deltaChip(refundTix.length,refundPrev.length,true)+'</td><td><span class="val-chip">$'+totalVal.toFixed(2)+'</span></td><td></td><td>'+partR.length+'</td></tr></tfoot></table></div></div></div>'+
     '<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-green"></span>Replacements by Product</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Product</th><th>Total</th><th>Upgrades</th><th>Free Gifts</th><th>Replacements</th></tr></thead><tbody>'+replRows+'</tbody><tfoot><tr class="total-row"><td>Total</td><td>'+replTix.length+'</td><td>'+freeU.length+'</td><td>'+freeG.length+'</td><td>'+replS.length+'</td></tr></tfoot></table></div></div></div>'+
     '</div>'+
+    // ── Agent × Product Matrix ─────────────────────────────────
+    (agentProdRows?'<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-cyan"></span>Agent × Product Breakdown</div><div class="section-block-subtitle">Which agent is handling refunds &amp; replacements across which products</div></div></div><div class="section-block-body"><div class="data-table-wrap"><table class="data-table"><thead><tr><th>Agent</th><th>Product</th><th>Total</th><th>Refunds</th><th>Replacements</th><th>Refund Value</th></tr></thead><tbody>'+agentProdRows+'</tbody></table></div></div></div>':'')+
+    // ── Individual ticket tables (existing) ───────────────────
     '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-red"></span>All Refund Tickets</div><div class="section-block-subtitle">'+refundTix.length+' tickets · newest first</div></div></div><div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Resolution</th><th>Value</th><th>Status</th><th>Date</th></tr></thead><tbody>'+refTicketRows+'</tbody></table></div></div></div></div>'+
     '<div class="section-block" style="margin-top:20px"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot dot-green"></span>All Replacement Tickets</div><div class="section-block-subtitle">'+replTix.length+' tickets · newest first</div></div></div><div class="section-block-body"><div class="ticket-list-wrap"><div class="data-table-wrap"><table class="data-table ticket-table"><thead><tr><th>Ticket ID</th><th>Customer</th><th>Product</th><th>Resolution</th><th>Contact Reason</th><th style="color:var(--amber)">Damage / Issue</th><th>Order No.</th><th>Status</th><th>Date</th></tr></thead><tbody>'+replTicketRows+'</tbody></table></div></div></div></div>';
   html+=renderExtraBlocks('refunds');
