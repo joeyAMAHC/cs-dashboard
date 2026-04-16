@@ -427,7 +427,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
 const DEFAULT_DASH_CONFIG = {
   fieldNames: {
     PRODUCT: 'Product', REASON: 'Contact Reason', DAMAGE: 'Pool Table Damage',
-    ARCADE_ISSUE: 'Arcade Machine Issue/Damage', PINBALL_ISSUE: 'Pinball Issue',
+    ARCADE_ISSUE: 'Arcade Machine Issue/Damage', PINBALL_ISSUE: 'Pinball Issue', DRIVER_ISSUE: 'Driver Issue',
     BROKEN_GAMES: 'Broken Games', COURIER: 'Courier', RESOLUTION: 'Resolution',
     REFUND_VALUE: 'Refund Value', ORDER_NUMBER: 'Shopify/Warehouse Number',
   },
@@ -515,6 +515,7 @@ function SettingsPanel({ onClose, authFetch, onSave }) {
     { key: 'DAMAGE', label: 'Pool Table Damage field' },
     { key: 'ARCADE_ISSUE', label: 'Arcade Issue/Damage field' },
     { key: 'PINBALL_ISSUE', label: 'Pinball Issue field' },
+    { key: 'DRIVER_ISSUE', label: 'Driver Issue field (Gearshift Pro)' },
     { key: 'BROKEN_GAMES', label: 'Broken Games field' },
     { key: 'COURIER', label: 'Courier field' },
     { key: 'RESOLUTION', label: 'Resolution field' },
@@ -1518,9 +1519,9 @@ table.csa-table{width:100%;border-collapse:collapse;font-size:.85rem}table.csa-t
 `
 
 // ── Config — reads from window.__dashConfig (set by SettingsPanel) with fallbacks ──
-const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number',KEG_MISSING_ITEM:'Kegerator Missing Item'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},kegerator:{products:['Gen 2.0']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
+const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',DRIVER_ISSUE:'Driver Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number',KEG_MISSING_ITEM:'Kegerator Missing Item'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},kegerator:{products:['Gen 2.0']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
 let FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,KEG_PRODUCTS,KEG_MISSING_REASON,COURIER_REASONS,OPS_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
-function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER,KEG_MISSING_ITEM:fn.KEG_MISSING_ITEM||_DC.fieldNames.KEG_MISSING_ITEM};KEG_MISSING_REASON=(c.kegerator&&c.kegerator.missingReason)||'Item Missing::Supplier Fault';POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;KEG_PRODUCTS=(c.kegerator&&c.kegerator.products)||_DC.kegerator.products;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
+function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,DRIVER_ISSUE:fn.DRIVER_ISSUE||_DC.fieldNames.DRIVER_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER,KEG_MISSING_ITEM:fn.KEG_MISSING_ITEM||_DC.fieldNames.KEG_MISSING_ITEM};KEG_MISSING_REASON=(c.kegerator&&c.kegerator.missingReason)||'Item Missing::Supplier Fault';POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;KEG_PRODUCTS=(c.kegerator&&c.kegerator.products)||_DC.kegerator.products;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
 // ── Collapsible blocks ───────────────────────────────────────
 let collapseState={};
 function toggleBlock(id){
@@ -2166,10 +2167,12 @@ function renderRefunds(){
   const did=fieldMap[FIELD_NAMES.DAMAGE.toLowerCase()];
   const aid=fieldMap[FIELD_NAMES.ARCADE_ISSUE.toLowerCase()];
   const pfid=fieldMap[FIELD_NAMES.PINBALL_ISSUE.toLowerCase()];
+  const dfid2=fieldMap[(FIELD_NAMES.DRIVER_ISSUE||'').toLowerCase()];
   // Returns the most specific damage/issue field that has a value for this ticket
   function getDamageOrIssue(t){
     const d=getFieldById(t,did);if(d&&d!=='Not Set')return d;
     const a=getFieldById(t,aid);if(a&&a!=='Not Set')return a;
+    const dr=getFieldById(t,dfid2);if(dr&&dr!=='Not Set')return dr;
     const p=getFieldById(t,pfid);if(p&&p!=='Not Set')return p;
     return'—';
   }
@@ -2324,36 +2327,43 @@ function renderPinball(){
   const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
   const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
   const pfid=fieldMap[FIELD_NAMES.PINBALL_ISSUE.toLowerCase()];
+  const dfid=fieldMap[(FIELD_NAMES.DRIVER_ISSUE||'').toLowerCase()];
   const total=tickets.length;
   const dots=['dot-purple','dot-cyan'];
-  // Use Pinball Issue field OR Contact Reason — catches tickets with correct product
-  // but wrong Contact Reason (same data quality issue as Pool and Arcade sections)
-  const hasPinballIssue=t=>{ const v=getFieldById(t,pfid); return v&&v!=='Not Set'; };
-  const sets=KELVIN_PRODUCTS.map((prod,i)=>({
-    product:prod,
-    tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))||hasPinballIssue(t))),
-    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))||hasPinballIssue(t))),
-    dot:dots[i]
-  }));
+  // Gearshift Pro uses DRIVER_ISSUE field; Pinball Machine uses PINBALL_ISSUE field
+  // Also catches tickets with correct product but any of the KELVIN_REASONS on Contact Reason
+  const getIssueFid=prod=>matchesValue(prod,'Gearshift Pro')?dfid:pfid;
+  const hasIssueFid=(t,ifid)=>{ const v=getFieldById(t,ifid); return v&&v!=='Not Set'; };
+  const sets=KELVIN_PRODUCTS.map((prod,i)=>{
+    const ifid=getIssueFid(prod);
+    return{
+      product:prod,
+      ifid,
+      tickets:tickets.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))||hasIssueFid(t,ifid))),
+      prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,pid),prod)&&(KELVIN_REASONS.some(r=>matchesValue(getFieldById(t,rid),r))||hasIssueFid(t,ifid))),
+      dot:dots[i]
+    };
+  });
   const allKelvin=dedup(sets.flatMap(s=>s.tickets));
   const allKelvinPrev=dedup(sets.flatMap(s=>s.prev));
   document.getElementById('badge-pinball').textContent=allKelvin.length;
   let html='<div class="page-header"><div><div class="page-title accent-purple">🎰 Kelvin Pinball &amp; Drivers</div><div class="page-subtitle">Pinball Machine · Gearshift Pro — Item Not Working &amp; Supplier Issues</div></div><div class="period-badge" id="pb-pinball">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
-  sets.forEach(({product,tickets:tix,prev,dot})=>{
-    const byI=sortedEntries(groupBy(tix,t=>getFieldById(t,pfid)||getFieldById(t,rid)));
-    const prevByI=groupBy(prev,t=>getFieldById(t,pfid)||getFieldById(t,rid));
+  sets.forEach(({product,tickets:tix,prev,dot,ifid})=>{
+    const issueLabel=matchesValue(product,'Gearshift Pro')?'Driver Issue':'Pinball Issue';
+    const byI=sortedEntries(groupBy(tix,t=>getFieldById(t,ifid)||getFieldById(t,rid)));
+    const prevByI=groupBy(prev,t=>getFieldById(t,ifid)||getFieldById(t,rid));
     // Also show breakdown by contact reason within this product
     const byR=sortedEntries(groupBy(tix,t=>getFieldById(t,rid)));
     const prevByR=groupBy(prev,t=>getFieldById(t,rid));
     html+='<div class="section-block"><div class="section-block-header"><div><div class="section-block-title"><span class="color-dot '+dot+'"></span>'+esc(product)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true)+'</div><div class="section-block-subtitle">'+tix.length+' tickets · prev: '+prev.length+'</div></div></div>'+
       '<div class="section-block-body">'+inlineStats(tix,prev,total)+
-      // Pinball Issue breakdown (primary)
-      (pfid?'<div style="margin-bottom:6px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">By Pinball Issue</div>'+expandableBreakdownTable(byI,'Pinball Issue',label=>(prevByI[label]||[]),fieldMap):'<div style="margin-bottom:6px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">By Contact Reason</div>'+expandableBreakdownTable(byR,'Contact Reason',label=>(prevByR[label]||[]),fieldMap))+
+      // Issue breakdown (primary) — Driver Issue for Gearshift Pro, Pinball Issue for Pinball Machine
+      (ifid?'<div style="margin-bottom:6px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">By '+issueLabel+'</div>'+expandableBreakdownTable(byI,issueLabel,label=>(prevByI[label]||[]),fieldMap):'<div style="margin-bottom:6px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3)">By Contact Reason</div>'+expandableBreakdownTable(byR,'Contact Reason',label=>(prevByR[label]||[]),fieldMap))+
       '</div></div>';
   });
-  // Combined total block
-  const byIAll=sortedEntries(groupBy(allKelvin,t=>getFieldById(t,pfid)||getFieldById(t,rid)));
-  const prevByIAll=groupBy(allKelvinPrev,t=>getFieldById(t,pfid)||getFieldById(t,rid));
+  // Combined total block — use the correct issue field per product per ticket
+  const byIAll=sortedEntries(groupBy(allKelvin,t=>getFieldById(t,getIssueFid(getFieldById(t,pid)))||getFieldById(t,rid)));
+  const prevByIAll=groupBy(allKelvinPrev,t=>getFieldById(t,getIssueFid(getFieldById(t,pid)))||getFieldById(t,rid));
   html+='<div class="section-block" style="border-color:rgba(167,139,250,.3)"><div class="section-block-header" style="background:var(--purple-soft)"><div><div class="section-block-title"><span class="color-dot dot-purple"></span>All Kelvin Products — Combined <span style="font-size:.8rem;font-weight:400">'+allKelvin.length+'</span> '+deltaChip(allKelvin.length,allKelvinPrev.length,true)+'</div><div class="section-block-subtitle">'+allKelvin.length+' total tickets · prev: '+allKelvinPrev.length+'</div></div></div><div class="section-block-body">'+inlineStats(allKelvin,allKelvinPrev,total)+expandableBreakdownTable(byIAll,'Pinball Issue / Reason',label=>(prevByIAll[label]||[]),fieldMap)+'</div></div>';
   html+=renderExtraBlocks('pinball');
   document.getElementById('pinball-content').innerHTML=html;
@@ -2578,6 +2588,7 @@ function buildOpsReportSummary(){
   const did=fieldMap[FIELD_NAMES.DAMAGE.toLowerCase()];
   const aid=fieldMap[FIELD_NAMES.ARCADE_ISSUE.toLowerCase()];
   const pfid=fieldMap[FIELD_NAMES.PINBALL_ISSUE.toLowerCase()];
+  const drivfid=fieldMap[(FIELD_NAMES.DRIVER_ISSUE||'').toLowerCase()];
   const resfid=fieldMap[FIELD_NAMES.RESOLUTION.toLowerCase()];
   const rvfid=fieldMap[FIELD_NAMES.REFUND_VALUE.toLowerCase()];
   const cid=fieldMap[FIELD_NAMES.COURIER.toLowerCase()];
@@ -2600,8 +2611,8 @@ function buildOpsReportSummary(){
     // Damage sub-breakdown: use whichever damage field is relevant and set
     const dmgMap={};
     tix.forEach(t=>{
-      const d=getFieldById(t,did);const a=getFieldById(t,aid);const pf=getFieldById(t,pfid);
-      const val=(d&&d!=='Not Set')?d:(a&&a!=='Not Set')?a:(pf&&pf!=='Not Set')?pf:null;
+      const d=getFieldById(t,did);const a=getFieldById(t,aid);const pf=getFieldById(t,pfid);const dr=getFieldById(t,drivfid);
+      const val=(d&&d!=='Not Set')?d:(a&&a!=='Not Set')?a:(dr&&dr!=='Not Set')?dr:(pf&&pf!=='Not Set')?pf:null;
       if(val){dmgMap[val]=(dmgMap[val]||0)+1;}
     });
     return{
