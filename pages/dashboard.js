@@ -310,6 +310,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
             { id: 'barfridge',   icon: '🧊', label: 'Bar Fridges' },
             { id: 'courier',     icon: '🚚', label: 'Courier Issues' },
             { id: 'ops',         icon: '⚙️', label: 'Ops Issues' },
+            { id: 'pma',         icon: '🏭', label: 'PMA Issues (3PL)' },
             { id: 'refunds',     icon: '💰', label: 'Refunds & Replacements' },
           ].map(({ id, icon, label }) => (
             <div key={id} className={`nav-item${id === 'overview' ? ' active' : ''}`} data-section={id} onClick={() => window.__showSection(id)}>
@@ -359,7 +360,7 @@ function DashboardApp({ user, onSignOut, authFetch, authPost }) {
             <div id="overview-content" style={{ display: 'none' }} />
           </div>
 
-          {['pool','arcade','pinball','kegerator','ledsigns','barfridge','courier','ops','refunds'].map(id => (
+          {['pool','arcade','pinball','kegerator','ledsigns','barfridge','courier','ops','pma','refunds'].map(id => (
             <div key={id} id={`section-${id}`} className="section-view">
               <div id={`${id}-content`}>
                 <div className="empty-state">
@@ -428,14 +429,15 @@ const DEFAULT_DASH_CONFIG = {
   fieldNames: {
     PRODUCT: 'Product', REASON: 'Contact Reason', DAMAGE: 'Pool Table Damage',
     ARCADE_ISSUE: 'Arcade Machine Issue/Damage', PINBALL_ISSUE: 'Pinball Issue', DRIVER_ISSUE: 'Driver Issue',
-    BROKEN_GAMES: 'Broken Games', COURIER: 'Courier', RESOLUTION: 'Resolution',
+    BROKEN_GAMES: 'Broken Games (GAO)', COURIER: 'Courier', RESOLUTION: 'Resolution',
     REFUND_VALUE: 'Refund Value', ORDER_NUMBER: 'Shopify/Warehouse Number',
   },
   pool: { product: 'CSLT Pool Tables', supplierReason: 'Item Damaged::Supplier Issue', courierReason: 'Item Damaged::Courier Fault' },
-  arcade: { products: ['Upright Arcade', 'Cocktail Pro', 'Cocktail MKII'], reason: 'Item Not Working' },
+  arcade: { products: ['Upright Arcade', 'Cocktail Pro', 'Cocktail MKII', 'Cocktail Classic', 'Series-X Plus', 'Grand Deluxe'], reason: 'Item Not Working' },
   pinball: { products: ['Pinball Machine', 'Gearshift Pro'], reasons: ['Item Not Working', 'Item Damaged::Supplier Issue'] },
   courier: { reasons: ['Item Missing::Courier Fault', 'WISMO::Item Delayed::Courier Fault', 'WISMO::Wrong Address::Customer Fault', 'Item Damaged::Courier Fault'] },
   ops: { reasons: ['Item Missing::Picking Issue::Ops Mistake', 'WISMO::Tracking Not Supplied', 'WISMO::Item Delayed::Ops Delay', 'WISMO::Wrong Address::Ops Fault', 'Wrong Item Delivered::Ops Misorder'] },
+  pma: { reasons: ['Item Missing::Picking Issue::Warehouse Mistake', 'Wrong Item Delivered::Warehouse Mispick'] },
   refunds: { refundValues: ['Refund', 'Partial Refund'], replacementValues: ['Free Product Upgrade', 'Free Gift', 'Replacement Sent'] },
   extraBlocks: { pool: [], arcade: [], pinball: [], courier: [], ops: [], refunds: [] },
   customSections: [],
@@ -1519,9 +1521,9 @@ table.csa-table{width:100%;border-collapse:collapse;font-size:.85rem}table.csa-t
 `
 
 // ── Config — reads from window.__dashConfig (set by SettingsPanel) with fallbacks ──
-const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',DRIVER_ISSUE:'Driver Issue',BROKEN_GAMES:'Broken Games',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number',KEG_MISSING_ITEM:'Kegerator Missing Item'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},kegerator:{products:['Gen 2.0']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
-let FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,KEG_PRODUCTS,KEG_MISSING_REASON,COURIER_REASONS,OPS_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
-function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,DRIVER_ISSUE:fn.DRIVER_ISSUE||_DC.fieldNames.DRIVER_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER,KEG_MISSING_ITEM:fn.KEG_MISSING_ITEM||_DC.fieldNames.KEG_MISSING_ITEM};KEG_MISSING_REASON=(c.kegerator&&c.kegerator.missingReason)||'Item Missing::Supplier Fault';POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;KEG_PRODUCTS=(c.kegerator&&c.kegerator.products)||_DC.kegerator.products;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
+const _DC={fieldNames:{PRODUCT:'Product',REASON:'Contact Reason',DAMAGE:'Pool Table Damage',ARCADE_ISSUE:'Arcade Machine Issue/Damage',PINBALL_ISSUE:'Pinball Issue',DRIVER_ISSUE:'Driver Issue',BROKEN_GAMES:'Broken Games (GAO)',COURIER:'Courier',RESOLUTION:'Resolution',REFUND_VALUE:'Refund Value',ORDER_NUMBER:'Shopify/Warehouse Number',KEG_MISSING_ITEM:'Kegerator Missing Item'},pool:{product:'CSLT Pool Tables',supplierReason:'Item Damaged::Supplier Issue',courierReason:'Item Damaged::Courier Fault'},arcade:{products:['Upright Arcade','Cocktail Pro','Cocktail MKII','Cocktail Classic','Series-X Plus','Grand Deluxe'],reason:'Item Not Working'},pinball:{products:['Pinball Machine','Gearshift Pro'],reasons:['Item Not Working','Item Damaged::Supplier Issue']},kegerator:{products:['Gen 2.0']},courier:{reasons:['Item Missing::Courier Fault','WISMO::Item Delayed::Courier Fault','WISMO::Wrong Address::Customer Fault','Item Damaged::Courier Fault']},ops:{reasons:['Item Missing::Picking Issue::Ops Mistake','WISMO::Tracking Not Supplied','WISMO::Item Delayed::Ops Delay','WISMO::Wrong Address::Ops Fault','Wrong Item Delivered::Ops Misorder']},pma:{reasons:['Item Missing::Picking Issue::Warehouse Mistake','Wrong Item Delivered::Warehouse Mispick']},refunds:{refundValues:['Refund','Partial Refund'],replacementValues:['Free Product Upgrade','Free Gift','Replacement Sent']}};
+let FIELD_NAMES,POOL_PRODUCT,REASON_SUPPLIER,REASON_COURIER_POOL,ARCADE_PRODUCTS,ARCADE_REASON,KELVIN_PRODUCTS,KELVIN_REASONS,KEG_PRODUCTS,KEG_MISSING_REASON,COURIER_REASONS,OPS_REASONS,PMA_REASONS,REFUND_VALUES,REPLACEMENT_VALUES;
+function loadConfig(){const c=window.__dashConfig||_DC;const fn=c.fieldNames||_DC.fieldNames;FIELD_NAMES={PRODUCT:fn.PRODUCT||_DC.fieldNames.PRODUCT,REASON:fn.REASON||_DC.fieldNames.REASON,DAMAGE:fn.DAMAGE||_DC.fieldNames.DAMAGE,ARCADE_ISSUE:fn.ARCADE_ISSUE||_DC.fieldNames.ARCADE_ISSUE,PINBALL_ISSUE:fn.PINBALL_ISSUE||_DC.fieldNames.PINBALL_ISSUE,DRIVER_ISSUE:fn.DRIVER_ISSUE||_DC.fieldNames.DRIVER_ISSUE,BROKEN_GAMES:fn.BROKEN_GAMES||_DC.fieldNames.BROKEN_GAMES,COURIER:fn.COURIER||_DC.fieldNames.COURIER,RESOLUTION:fn.RESOLUTION||_DC.fieldNames.RESOLUTION,REFUND_VALUE:fn.REFUND_VALUE||_DC.fieldNames.REFUND_VALUE,ORDER_NUMBER:fn.ORDER_NUMBER||_DC.fieldNames.ORDER_NUMBER,KEG_MISSING_ITEM:fn.KEG_MISSING_ITEM||_DC.fieldNames.KEG_MISSING_ITEM};KEG_MISSING_REASON=(c.kegerator&&c.kegerator.missingReason)||'Item Missing::Supplier Fault';POOL_PRODUCT=(c.pool&&c.pool.product)||_DC.pool.product;REASON_SUPPLIER=(c.pool&&c.pool.supplierReason)||_DC.pool.supplierReason;REASON_COURIER_POOL=(c.pool&&c.pool.courierReason)||_DC.pool.courierReason;ARCADE_PRODUCTS=(c.arcade&&c.arcade.products)||_DC.arcade.products;ARCADE_REASON=(c.arcade&&c.arcade.reason)||_DC.arcade.reason;KELVIN_PRODUCTS=(c.pinball&&c.pinball.products)||_DC.pinball.products;KELVIN_REASONS=(c.pinball&&c.pinball.reasons)||_DC.pinball.reasons;KEG_PRODUCTS=(c.kegerator&&c.kegerator.products)||_DC.kegerator.products;COURIER_REASONS=(c.courier&&c.courier.reasons)||_DC.courier.reasons;OPS_REASONS=(c.ops&&c.ops.reasons)||_DC.ops.reasons;PMA_REASONS=(c.pma&&c.pma.reasons)||_DC.pma.reasons;REFUND_VALUES=(c.refunds&&c.refunds.refundValues)||_DC.refunds.refundValues;REPLACEMENT_VALUES=(c.refunds&&c.refunds.replacementValues)||_DC.refunds.replacementValues;}
 // ── Collapsible blocks ───────────────────────────────────────
 let collapseState={};
 function toggleBlock(id){
@@ -1760,7 +1762,7 @@ function renderCustomSections(){
 
 function renderAll(){
   loadConfig();
-  renderOverview();renderPool();renderArcade();renderPinball();renderKegerators();renderLEDBars();renderBarFridges();renderCourier();renderOps();renderRefunds();renderCustomSections();renderOpsReport();updateBadges();
+  renderOverview();renderPool();renderArcade();renderPinball();renderKegerators();renderLEDBars();renderBarFridges();renderCourier();renderOps();renderPMA();renderRefunds();renderCustomSections();renderOpsReport();updateBadges();
   document.getElementById('welcome').style.display='none';
   document.getElementById('overview-content').style.display='block';
   // Wire up collapsible block headers + agent filter chips via event delegation
@@ -1973,7 +1975,9 @@ function renderPool(){
   // This catches tickets where the agent recorded the correct damage type but used the
   // wrong Contact Reason (e.g. WISMO instead of Item Damaged), which previously made
   // them invisible to the stats.
-  const hasDamage=t=>{ const d=getFieldById(t,did); return d&&d!=='Not Set'; };
+  // Catch tickets where agent filled damage type field, OR where contact reason clearly indicates
+  // a damage event (handles cases where agent set the reason but forgot the damage sub-field)
+  const hasDamage=t=>{ const d=getFieldById(t,did); if(d&&d!=='Not Set')return true; const r=getFieldById(t,rid); return matchesValue(r,REASON_SUPPLIER)||matchesValue(r,REASON_COURIER_POOL); };
   const poolDamageT=poolT.filter(hasDamage);
   const poolDamagePrev=poolPrev.filter(hasDamage);
   const supT=poolDamageT.filter(t=>matchesValue(getFieldById(t,rid),REASON_SUPPLIER));
@@ -2157,6 +2161,50 @@ function renderOps(){
   document.getElementById('ops-content').innerHTML=html;
 }
 
+function renderPMA(){
+  const{tickets,ticketsPrev,fieldMap}=state;
+  const rid=fieldMap[FIELD_NAMES.REASON.toLowerCase()];
+  const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
+  const total=tickets.length;
+  const pmaGroups=PMA_REASONS.map(reason=>({
+    reason,
+    tickets:tickets.filter(t=>matchesValue(getFieldById(t,rid),reason)),
+    prev:ticketsPrev.filter(t=>matchesValue(getFieldById(t,rid),reason))
+  }));
+  const pmaTotal=dedup(pmaGroups.flatMap(g=>g.tickets)).length;
+  const pmaPrevTotal=dedup(pmaGroups.flatMap(g=>g.prev)).length;
+  document.getElementById('badge-pma').textContent=pmaTotal;
+  const scAll={open:0,closed:0,pending:0};
+  let summaryRows=pmaGroups.map(({reason,tickets:tix,prev})=>{
+    const sc=statusCounts(tix);
+    scAll.open+=sc.open;scAll.closed+=sc.closed;scAll.pending+=sc.pending;
+    const did2='dr'+(++_drillId);
+    return'<tr class="drill-row-hdr" data-drill-id="'+did2+'">'+
+      '<td style="max-width:300px;white-space:normal">'+esc(reason)+'<span class="drill-arrow" id="darr-'+did2+'">▸</span></td>'+
+      '<td style="font-weight:600">'+tix.length+'</td>'+
+      '<td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+prev.length+'</td>'+
+      '<td style="text-align:right">'+deltaChip(tix.length,prev.length,true)+'</td>'+
+      '<td><span class="tag tag-open">'+sc.open+'</span></td>'+
+      '<td><span class="tag tag-closed">'+sc.closed+'</span></td>'+
+      '<td><span class="tag tag-pending">'+sc.pending+'</span></td></tr>'+
+      '<tr class="drill-content" id="dcnt-'+did2+'"><td colspan="7" style="padding:0">'+ticketDrillHtml(tix,fieldMap)+'</td></tr>';
+  }).join('');
+  let html='<div class="page-header"><div><div class="page-title accent-amber">🏭 PMA Issues (3PL)</div><div class="page-subtitle">Warehouse mistakes attributable to PMA — picking errors &amp; wrong items</div></div><div class="period-badge" id="pb-pma">'+getPeriodLabel()+' <span style="color:var(--text-3);font-size:.72rem">vs '+state.prevLabel+'</span></div></div>';
+  html+=sectionBlock({title:'PMA Summary — All Reasons <span style="font-size:.8rem;font-weight:400">'+pmaTotal+'</span> '+deltaChip(pmaTotal,pmaPrevTotal,true),dot:'dot-amber',
+    summaryItems:[{val:pmaTotal,label:'Total',color:'var(--amber)'},{val:scAll.open,label:'Open',color:'var(--amber)'},{val:scAll.closed,label:'Closed',color:'var(--green)'},{val:scAll.pending,label:'Pending',color:'var(--purple)'},{val:deltaChip(pmaTotal,pmaPrevTotal,true)||'—',label:'vs Prev'}],
+    bodyHtml:'<div class="data-table-wrap"><table class="data-table"><thead><tr><th>Contact Reason</th><th>Total</th><th style="color:var(--text-3)">Prev</th><th>Δ</th><th>Open</th><th>Closed</th><th>Pending</th></tr></thead><tbody>'+summaryRows+'</tbody><tfoot><tr class="total-row"><td>TOTAL</td><td>'+pmaTotal+'</td><td style="color:var(--text-3);font-family:var(--font-data);text-align:right">'+pmaPrevTotal+'</td><td style="text-align:right">'+deltaChip(pmaTotal,pmaPrevTotal,true)+'</td><td><span class="tag tag-open">'+scAll.open+'</span></td><td><span class="tag tag-closed">'+scAll.closed+'</span></td><td><span class="tag tag-pending">'+scAll.pending+'</span></td></tr></tfoot></table></div>'});
+  const dots=['dot-amber','dot-red'];
+  pmaGroups.forEach(({reason,tickets:tix,prev},i)=>{
+    const sc=statusCounts(tix);const avg=avgResHours(tix);
+    const byP=sortedEntries(groupBy(tix,t=>getFieldById(t,pid)));
+    const prevByP=groupBy(prev,t=>getFieldById(t,pid));
+    html+=sectionBlock({title:esc(reason)+' <span style="font-size:.8rem;font-weight:400;color:var(--text-2)">'+tix.length+'</span> '+deltaChip(tix.length,prev.length,true),subtitle:tix.length+' tickets · prev: '+prev.length+' · '+pct(tix.length,total)+' of all',dot:dots[i]||'dot-amber',
+      summaryItems:[{val:tix.length,label:'Total'},{val:sc.open,label:'Open',color:'var(--amber)'},{val:sc.closed,label:'Closed',color:'var(--green)'},{val:sc.pending,label:'Pending',color:'var(--purple)'},{val:avg?avg+'h':'—',label:'Avg Res.'},{val:deltaChip(tix.length,prev.length,true)||'—',label:'vs Prev'}],
+      bodyHtml:expandableBreakdownTable(byP,'Product',label=>(prevByP[label]||[]),fieldMap)});
+  });
+  document.getElementById('pma-content').innerHTML=html;
+}
+
 function renderRefunds(){
   const{tickets,ticketsPrev,fieldMap}=state;
   const pid=fieldMap[FIELD_NAMES.PRODUCT.toLowerCase()];
@@ -2209,7 +2257,8 @@ function renderRefunds(){
     const isSupplier=matchesValue(reason,REASON_SUPPLIER)||matchesValue(reason,'Item Damaged::Supplier Issue');
     const isCourier=COURIER_REASONS.some(r=>matchesValue(reason,r));
     const isOps=OPS_REASONS.some(r=>matchesValue(reason,r));
-    const fault=isSupplier?'<span style="color:var(--amber);font-size:.7rem;font-weight:700;letter-spacing:.04em">SUPPLIER</span>':isCourier?'<span style="color:var(--red);font-size:.7rem;font-weight:700;letter-spacing:.04em">COURIER</span>':isOps?'<span style="color:var(--purple);font-size:.7rem;font-weight:700;letter-spacing:.04em">OPS</span>':'<span style="color:var(--text-3);font-size:.7rem">INTERNAL</span>';
+    const isPMA=PMA_REASONS.some(r=>matchesValue(reason,r));
+    const fault=isSupplier?'<span style="color:var(--amber);font-size:.7rem;font-weight:700;letter-spacing:.04em">SUPPLIER</span>':isCourier?'<span style="color:var(--red);font-size:.7rem;font-weight:700;letter-spacing:.04em">COURIER</span>':isOps?'<span style="color:var(--purple);font-size:.7rem;font-weight:700;letter-spacing:.04em">OPS</span>':isPMA?'<span style="color:var(--amber);font-size:.7rem;font-weight:700;letter-spacing:.04em">PMA</span>':'<span style="color:var(--text-3);font-size:.7rem">INTERNAL</span>';
     const did2='dr'+(++_drillId);
     return'<tr class="drill-row-hdr" data-drill-id="'+did2+'">'+
       '<td style="max-width:260px;white-space:normal">'+esc(reason)+'<span class="drill-arrow" id="darr-'+did2+'">▸</span></td>'+
